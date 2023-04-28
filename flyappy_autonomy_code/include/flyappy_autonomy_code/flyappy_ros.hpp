@@ -24,4 +24,7 @@ class FlyappyRos
     ros::Subscriber sub_game_ended_;  ///< Subscriber for crash detection
 
     Flyappy flyappy_;  ///< ROS-free main code
+
+    geometry_msgs::Vector3 pos_;    ///< Position 
+    bool started_ = false;          ///< Whether the game has started, for position normalization
 };
