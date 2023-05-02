@@ -1,9 +1,14 @@
 #include "flyappy_autonomy_code/flyappy_ros.hpp"
 
 constexpr uint32_t QUEUE_SIZE = 5u;
-const float dt = 1.0f/30.0f;  // Define time step 30Hz
+const float dt = 1.0f/30.0f;  // Time step at 30Hz
+const double max_laser_range = 3.550000; // Known max laser range
+
 const float y_init = 1.36f;   // Approx initial height
 const float y_max = 3.8f;     // Approx max height
+
+const float obs_width = 0.5f; // Approx obstacle width
+const float obs_spacing = 1.92f; // Approx obstacle spacing
 
 //------------------------------------------------------------------------------
 // GENERAL FUNCTIONS
@@ -16,6 +21,17 @@ geometry_msgs::Vector3 getPoint(geometry_msgs::Vector3 pos, double angle, double
 
     point.x = pos.x + range * std::cos(angle);
     point.y = pos.y + range * std::sin(angle);
+
+    return point;
+}
+
+geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angle, float x)
+{
+    // Calculate coordinate of intersection point between laser and vertical line at x
+    geometry_msgs::Vector3 point;
+
+    point.x = x;
+    point.y = pos.y + ((x - pos.x) * std::tan(angle));
 
     return point;
 }
@@ -37,11 +53,16 @@ void Obstacle::clear()
     obstacleArray_.fill(2);  // 2 = unknown
 }
 
-void Obstacle::add(float y) 
+void Obstacle::add(float y, int state) 
 {
-    // Convert y to index
-    int y_index = (int)std::round((y / y_max) * 31.0f);
-    //obstacleArray_[x] |= 1 << y;
+    // Convert y to array index
+    int i = (int)std::round((y / y_max) * 31.0f);
+
+    // Only change state if it isn't already known to be obstacle
+    if (obstacleArray_[i] != 1)
+    {
+        obstacleArray_[i] = state;
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -60,20 +81,31 @@ void ObstaclePair::clear()
     obs2_.clear();
 }
 
-void ObstaclePair::add(float x, float y) 
+void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range) 
 {
-    // Convert x to index
-    int x_index = (int)std::round((x / 1.92f) * 31.0f);
+    // Calculate coordinate of laser impact
+    geometry_msgs::Vector3 impact_point = getPoint(pos, angle, range);
 
-    // Add obstacle to correct pipe
-    if (x_index < 16)
+    // Find which obstacle the point belongs to
+    if ((obs_spacing - obs_width) <= impact_point.x <= obs_spacing)
     {
-        obs1_.add(y);
+        obs1_.add(impact_point.y, 1);
     }
-    else
-    {
-        obs2_.add(y);
+    else if (impact_point.x > obs_spacing)
+    {   
+        geometry_msgs::Vector3 intersect_point = getIntersectPoint(pos, angle, (obs_spacing - (0.5*obs_width)));
+        obs1_.add(intersect_point.y, 0);
+        if (((2*obs_spacing) - obs_width) <= impact_point.x <= (2*obs_spacing) && range < max_laser_range)
+        {
+            obs2_.add(impact_point.y, 1);
+        }
     }
+}
+
+std:string ObstaclePair::represent()
+{
+    // Represent the obstacle pair as a string
+    
 }
 
 //------------------------------------------------------------------------------
@@ -116,9 +148,9 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
     }
 
     // Normalize to last pipe (New pipe every 1.92m)
-    if (started_ && pos_.x > 1.92f)
+    if (started_ && pos_.x > obs_spacing)
     {
-        pos_.x = std::fmod(pos_.x, 1.92f);
+        pos_.x = std::fmod(pos_.x, obs_spacing);
     }
 
     ROS_INFO("Position: %f, %f", pos_.x, pos_.y); 
@@ -132,15 +164,12 @@ void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
     for (size_t i = 0; i < msg->ranges.size(); i++) {
         double angle = msg->angle_min + i * msg->angle_increment;
         double range = msg->ranges[i];
-        
-        // Get point of laser impact
-        impact_point = getPoint(pos_, angle, range);
 
         // Add point to ObstaclePair
-        obs_pair_.add(impact_point.x, impact_point.y);
+        obs_pair_.add(pos_, angle, range);
     }
     
-    //ROS_INFO("Laser range: %f, angle: %f", msg->ranges[0], msg->angle_min);
+    ROS_INFO("%d", obs_pair_.obs1_.obstacleArray_[0]);
 }
 
 void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)

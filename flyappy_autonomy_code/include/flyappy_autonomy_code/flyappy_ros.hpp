@@ -13,7 +13,7 @@ class Obstacle
   public:
     Obstacle();
     void clear();
-    void add(float y);
+    void add(float y, int state);
 
   private:
     std::array<int, 32> obstacleArray_;
@@ -24,7 +24,8 @@ class ObstaclePair
   public:
     ObstaclePair();
     void clear();
-    void add(float x, float y);
+    void add(geometry_msgs::Vector3 pos, double angle, double range);
+    std::string represent();
 
   private:
     Obstacle obs1_;
