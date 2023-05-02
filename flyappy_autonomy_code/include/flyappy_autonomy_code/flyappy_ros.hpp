@@ -8,6 +8,29 @@
 
 #include "flyappy_autonomy_code/flyappy.hpp"
 
+class Obstacle 
+{
+  public:
+    Obstacle();
+    void clear();
+    void add(float y);
+
+  private:
+    std::array<int, 32> obstacleArray_;
+};
+
+class ObstaclePair
+{
+  public:
+    ObstaclePair();
+    void clear();
+    void add(float x, float y);
+
+  private:
+    Obstacle obs1_;
+    Obstacle obs2_;
+};
+
 class FlyappyRos
 {
   public:
@@ -27,4 +50,6 @@ class FlyappyRos
 
     geometry_msgs::Vector3 pos_;    ///< Position 
     bool started_ = false;          ///< Whether the game has started, for position normalization
+
+    ObstaclePair obs_pair_;         ///< Obstacle pair
 };
