@@ -8,7 +8,8 @@
 
 #include "flyappy_autonomy_code/flyappy.hpp"
 
-const int obs_array_size_ = 32;
+const int y_max_ = 4.1f;
+const int obs_array_size_ = int(y_max_ * 20.0f) + 1;
 
 geometry_msgs::Vector3 getPoint(geometry_msgs::Vector3 pos, double angle, double range);
 geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angle, float x);

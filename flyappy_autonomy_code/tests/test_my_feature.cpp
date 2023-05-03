@@ -75,7 +75,7 @@ TEST(ObstaclePair, AddObstacleAfterFreeObs1)
     // Add free reading in the first obstacle array
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     double angle = 0.0;
     double range = 3.0;
 
@@ -93,7 +93,7 @@ TEST(ObstaclePair, AddObstacleAfterFreeObs1)
 
     // Add an obstacle in the same place
     pos.x = 0.0;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     angle = 0.0;
     range = 1.8;
 
@@ -114,7 +114,7 @@ TEST(ObstaclePair, AddFreeAfterObstacleObs1)
     // Add free reading in the first obstacle array
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     double angle = 0.0;
     double range = 3.0;
 
@@ -131,7 +131,7 @@ TEST(ObstaclePair, AddFreeAfterObstacleObs1)
 
     // Add an obstacle in the same place
     pos.x = 0.0;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     angle = 0.0;
     range = 1.8;
 
@@ -145,7 +145,7 @@ TEST(ObstaclePair, AddFreeAfterObstacleObs1)
 
     // Add a free reading in the same spot again, which should not change anything
     pos.x = 0.0;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     angle = 0.0;
     range = 3.0;
 
@@ -171,7 +171,7 @@ TEST(ObstaclePair, AddFreeObstacleFreeObs2)
     // Perform same routine as on obs1_ - free reading, obstacle, free reading
     geometry_msgs::Vector3 pos;
     pos.x = 1.9;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     double angle = 0.0;
     double range = 3.0;
 
@@ -182,7 +182,7 @@ TEST(ObstaclePair, AddFreeObstacleFreeObs2)
     ASSERT_TRUE(obs2Array == expected_obs);
 
     pos.x = 1.9;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     angle = 0.0;
     range = 1.82;
 
@@ -193,7 +193,7 @@ TEST(ObstaclePair, AddFreeObstacleFreeObs2)
     ASSERT_TRUE(obs2Array == expected_obs);
 
     pos.x = 1.9;
-    pos.y = 3.799;
+    pos.y = y_max_ - 0.001;
     angle = 0.0;
     range = 3.0;
 

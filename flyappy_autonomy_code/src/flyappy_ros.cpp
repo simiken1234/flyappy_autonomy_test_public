@@ -4,8 +4,8 @@ constexpr uint32_t QUEUE_SIZE = 5u;
 const float dt = 1.0f/30.0f;  // Time step at 30Hz
 const double max_laser_range = 3.550000; // Known max laser range
 
-const float y_init = 1.36f;   // Approx initial height
-const float y_max = 3.8f;     // Approx max height
+const float y_init = 1.555f;   // Approx initial height
+const float y_max = y_max_;     // Approx max height
 
 const float obs_width = 0.5f; // Approx obstacle width
 const float obs_spacing = 1.92f; // Approx obstacle spacing
@@ -22,6 +22,8 @@ geometry_msgs::Vector3 getPoint(geometry_msgs::Vector3 pos, double angle, double
 
     point.x = pos.x + range * std::cos(angle);
     point.y = pos.y + range * std::sin(angle);
+
+    ROS_INFO("Point: (%f, %f)", point.x, point.y);
 
     return point;
 }
@@ -198,7 +200,7 @@ void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         obs_pair_.add(pos_, angle, range);
     }
     
-    ROS_INFO("Laser range: %f, angle: %f", msg->ranges[4], (msg->angle_min + (msg->angle_increment * 4)));
+    //ROS_INFO("Laser range: %f, angle: %f", msg->ranges[4], (msg->angle_min + (msg->angle_increment * 4)));
 }
 
 void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
