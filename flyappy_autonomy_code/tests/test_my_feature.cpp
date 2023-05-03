@@ -203,6 +203,43 @@ TEST(ObstaclePair, AddFreeObstacleFreeObs2)
     ASSERT_TRUE(obs2Array == expected_obs);
 }
 
+TEST(ObstaclePair, moveObs)
+{
+        ObstaclePair obs_pair;
+        obs_pair.clear();
+
+        // Add random detections
+        geometry_msgs::Vector3 pos;
+        pos.x = 1.5;
+        pos.y = 1.0;
+
+        double angle = 0.0;
+        double range = 2.4;
+        obs_pair.add(pos, angle, range);
+
+        range = 3.0;
+        angle = 0.485;
+        obs_pair.add(pos, angle, range);
+
+        // Save contents of obs2
+        std::array<int, 32> obs2Array = obs_pair.getObstacleArray(2);
+
+        obs_pair.moveObs();
+
+        std::array<int, 32> obs1Array = obs_pair.getObstacleArray(1);
+        
+        // Check that old obs2 array matches new obs1 array
+        ASSERT_TRUE(obs1Array == obs2Array);
+
+        // Update obs2 array
+        obs2Array = obs_pair.getObstacleArray(2);
+        std::array<int, 32> clearArray;
+        clearArray.fill(2);
+
+        // Check that obs2 array is all set to unknown
+        ASSERT_TRUE(obs2Array == clearArray);
+}
+
 int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);

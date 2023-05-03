@@ -28,6 +28,7 @@ class ObstaclePair
   public:
     ObstaclePair();
     void clear();
+    void moveObs();
     void add(geometry_msgs::Vector3 pos, double angle, double range);
     std::array<int, 32> getObstacleArray(int i);
 

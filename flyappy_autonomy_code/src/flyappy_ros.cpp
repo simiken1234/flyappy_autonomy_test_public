@@ -86,6 +86,13 @@ void ObstaclePair::clear()
     obs2_.clear();
 }
 
+void ObstaclePair::moveObs()
+{
+    // Move obs2 to obs1 and clear obs2 for next obstacle
+    obs1_ = std::move(obs2_);
+    obs2_.clear();
+}
+
 void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range) 
 {
     // Calculate coordinate of laser impact
@@ -170,6 +177,7 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
     // Normalize to last pipe (New pipe every 1.92m)
     if (started_ && pos_.x > obs_spacing)
     {
+        obs_pair_.moveObs();
         pos_.x = std::fmod(pos_.x, obs_spacing);
     }
 
