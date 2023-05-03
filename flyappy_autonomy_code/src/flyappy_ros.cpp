@@ -40,6 +40,7 @@ geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angl
 
 int getGapQuality(int unknown_count, int free_count)
 {
+    //ROS_INFO("Unknown count: %i, Free count: %i", unknown_count, free_count);
     // Check if gap is sufficiently big
     if ((unknown_count + free_count) >= obs_gap_i)
     {
@@ -79,6 +80,11 @@ void Obstacle::add(float y, int state)
     }
 }
 
+void Obstacle::setObstacleArray(std::array<int, obs_array_size_> new_obstacle_array)
+{
+    obstacleArray_ = new_obstacle_array;
+}
+
 gap Obstacle::findGap()
 {
     // Find best gap available and return its quality and middle y coordinate
@@ -108,7 +114,8 @@ gap Obstacle::findGap()
                 {
                     // If gap is the best found yet, update best
                     best_gap_quality = current_gap_quality;
-                    best_gap_y = (float(i) - (float(free_count + unknown_count) / 2)) * y_max; // y is for middle of the gap
+                    best_gap_y = (float(i) - (float(free_count + unknown_count) / 2)) * (y_max / float(obs_array_size_)); 
+                    // y is for middle of the gap
                 }
 
                 // Reset unknown and free counters, new gap beginning
@@ -124,7 +131,7 @@ gap Obstacle::findGap()
     {
         // If gap is the best found yet, update best
         best_gap_quality = current_gap_quality;
-        best_gap_y = (float(obs_array_size_ - 1) - (float(free_count + unknown_count) / 2)) * y_max; // y is for middle of the gap
+        best_gap_y = (float(obs_array_size_ - 1) - (float(free_count + unknown_count) / 2)) * (y_max / float(obs_array_size_));
     }
 
     // If no suitable gap was found, something must have gone wrong. Failsafe by clearing obs to start over
@@ -134,6 +141,8 @@ gap Obstacle::findGap()
         clear();
     }
 
+    //std::cout<<"Best gap y: "<<best_gap_y<<std::endl;
+    //std::cout<<"Best gap quality: "<<best_gap_quality<<std::endl;
     return {best_gap_y, best_gap_quality};
 }
 
@@ -251,6 +260,7 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
     {
         pos_.x -= 4.38f;
         started_ = true;
+        obs_pair_.clear();
     }
 
     // Normalize to last pipe (New pipe every 1.92m)
@@ -260,25 +270,27 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
         pos_.x = std::fmod(pos_.x, obs_spacing);
     }
 
-    //ROS_INFO("Position: %f, %f", pos_.x, pos_.y); 
+    ROS_INFO("y - position: %f", pos_.y); 
 }
 
 void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {   
     geometry_msgs::Vector3 impact_point;
+    if (started_)
+    {
+        // Loop through the angles in the laser scan message
+        for (size_t i = 0; i < msg->ranges.size(); i++) {
+            double angle = msg->angle_min + i * msg->angle_increment;
+            double range = msg->ranges[i];
 
-    // Loop through the angles in the laser scan message
-    for (size_t i = 0; i < msg->ranges.size(); i++) {
-        double angle = msg->angle_min + i * msg->angle_increment;
-        double range = msg->ranges[i];
+            // Add point to ObstaclePair
+            obs_pair_.add(pos_, angle, range);
+        }
 
-        // Add point to ObstaclePair
-        obs_pair_.add(pos_, angle, range);
+        // Update current_gap with new info
+        current_gap = obs_pair_.findGap();
+        ROS_INFO("Current gap y: %f, quality: %i", current_gap.y, current_gap.quality);
     }
-    
-    // Update current_gap with new info
-    current_gap = obs_pair_.findGap();
-    ROS_INFO("Current gap y: %f, quality: %i", current_gap.y, current_gap.quality);
     //ROS_INFO("Laser range: %f, angle: %f", msg->ranges[4], (msg->angle_min + (msg->angle_increment * 4)));
 }
 

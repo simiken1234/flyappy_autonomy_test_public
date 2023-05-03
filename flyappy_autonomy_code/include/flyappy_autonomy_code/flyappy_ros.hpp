@@ -27,6 +27,7 @@ class Obstacle
     Obstacle();
     void clear();
     void add(float y, int state);
+    void setObstacleArray(std::array<int, obs_array_size_> new_obstacle_array);
     std::array<int, obs_array_size_> getObstacleArray();
     gap findGap();
 

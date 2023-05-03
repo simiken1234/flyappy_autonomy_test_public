@@ -3,6 +3,8 @@
 #include "flyappy_autonomy_code/flyappy.hpp"
 #include "flyappy_autonomy_code/flyappy_ros.hpp"
 
+const float gap_y_tolerance = 0.1f;
+
 TEST(GeneralFunctions, getPoint)
 {
     geometry_msgs::Vector3 pos;
@@ -41,6 +43,59 @@ TEST(GeneralFunctions, getIntersectPoint)
 
     ASSERT_NEAR(point.x, 3.0, 0.0001);
     ASSERT_NEAR(point.y, 3.0, 0.0001);
+}
+
+TEST(GeneralFunctions, getGapQuality)
+{
+    // All counts zero case
+    int q = getGapQuality(0, 0);
+    ASSERT_EQ(0, q);
+
+    // Gap too small case
+    q = getGapQuality(1, 1);
+    ASSERT_EQ(0, q);
+
+    // Gap big enough
+    q = getGapQuality(20, 20);
+    ASSERT_TRUE(q > 0);
+
+    // Compare unknown gap and known free gap
+    int q_unk = getGapQuality(40, 0);
+    int q_kno = getGapQuality(0, 40);
+
+    ASSERT_TRUE(q_kno > q_unk);
+    ASSERT_EQ(q_unk, 40);
+    ASSERT_EQ(q_kno, obs_array_size_ * 40);
+
+    // Combined
+    q = getGapQuality(30, 20);
+    ASSERT_EQ(q, 30 + (20 * obs_array_size_));
+}
+
+TEST(Obstacle, findGapAllUnknown)
+{
+    Obstacle obs;
+    obs.clear();
+    gap g = obs.findGap();
+    ASSERT_NEAR(g.y, y_max_/2.0f, gap_y_tolerance);
+    ASSERT_EQ(g.quality, obs_array_size_);
+}
+
+TEST(Obstacle, findGapPartUnknown)
+{
+    Obstacle obs;
+    std::array<int, obs_array_size_> new_obs_array;
+    new_obs_array.fill(1);
+    for (int i = 0; i < 50; i++)
+    {
+        new_obs_array[i] = 2;
+    }
+    obs.setObstacleArray(new_obs_array);
+    gap g = obs.findGap();
+
+    float y_exp = (y_max_/float(obs_array_size_)) * 25.0f;
+    ASSERT_NEAR(g.y, y_exp, gap_y_tolerance);
+    ASSERT_EQ(g.quality, 50);
 }
 
 TEST(ObstaclePair, AddFreeObs1)
