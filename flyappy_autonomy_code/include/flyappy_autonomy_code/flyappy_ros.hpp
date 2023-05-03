@@ -14,6 +14,7 @@ class Obstacle
     Obstacle();
     void clear();
     void add(float y, int state);
+    std::array<int, 32> getObstacleArray();
 
   private:
     std::array<int, 32> obstacleArray_;
@@ -25,7 +26,7 @@ class ObstaclePair
     ObstaclePair();
     void clear();
     void add(geometry_msgs::Vector3 pos, double angle, double range);
-    std::string represent();
+    std::array<int, 32> getObstacleArray(int i);
 
   private:
     Obstacle obs1_;

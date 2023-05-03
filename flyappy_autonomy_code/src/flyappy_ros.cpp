@@ -65,6 +65,11 @@ void Obstacle::add(float y, int state)
     }
 }
 
+std::array<int, 32> Obstacle::getObstacleArray() 
+{
+    return obstacleArray_;
+}
+
 //------------------------------------------------------------------------------
 // OBSTACLEPAIR CLASS
 //------------------------------------------------------------------------------
@@ -87,7 +92,7 @@ void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range)
     geometry_msgs::Vector3 impact_point = getPoint(pos, angle, range);
 
     // Find which obstacle the point belongs to
-    if ((obs_spacing - obs_width) <= impact_point.x <= obs_spacing)
+    if ((obs_spacing - obs_width) <= impact_point.x && impact_point.x <= obs_spacing)
     {
         obs1_.add(impact_point.y, 1);
     }
@@ -95,17 +100,32 @@ void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range)
     {   
         geometry_msgs::Vector3 intersect_point = getIntersectPoint(pos, angle, (obs_spacing - (0.5*obs_width)));
         obs1_.add(intersect_point.y, 0);
-        if (((2*obs_spacing) - obs_width) <= impact_point.x <= (2*obs_spacing) && range < max_laser_range)
+        if (((2*obs_spacing) - obs_width) <= impact_point.x && impact_point.x <= (2*obs_spacing) && range < max_laser_range)
         {
             obs2_.add(impact_point.y, 1);
+        }
+        else if (impact_point.x > (2*obs_spacing))
+        {
+            intersect_point = getIntersectPoint(pos, angle, ((2*obs_spacing) - (0.5*obs_width)));
+            obs2_.add(intersect_point.y, 0);
         }
     }
 }
 
-std:string ObstaclePair::represent()
+std::array<int, 32> ObstaclePair::getObstacleArray(int i) 
 {
-    // Represent the obstacle pair as a string
-    
+    if (i == 1)
+    {
+        return obs1_.getObstacleArray();
+    }
+    else if (i == 2)
+    {
+        return obs2_.getObstacleArray();
+    }
+    else
+    {
+        return {};
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -153,7 +173,7 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
         pos_.x = std::fmod(pos_.x, obs_spacing);
     }
 
-    ROS_INFO("Position: %f, %f", pos_.x, pos_.y); 
+    //ROS_INFO("Position: %f, %f", pos_.x, pos_.y); 
 }
 
 void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
@@ -169,7 +189,7 @@ void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         obs_pair_.add(pos_, angle, range);
     }
     
-    ROS_INFO("%d", obs_pair_.obs1_.obstacleArray_[0]);
+    ROS_INFO("Laser range: %f, angle: %f", msg->ranges[4], (msg->angle_min + (msg->angle_increment * 4)));
 }
 
 void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
