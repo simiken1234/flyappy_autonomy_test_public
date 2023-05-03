@@ -13,6 +13,13 @@ const int obs_array_size_ = int(y_max_ * 20.0f) + 1;
 
 geometry_msgs::Vector3 getPoint(geometry_msgs::Vector3 pos, double angle, double range);
 geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angle, float x);
+int getGapQuality(int unknown_count, int free_count);
+
+struct gap
+{
+  float y;
+  int quality;
+};
 
 class Obstacle 
 {
@@ -21,6 +28,7 @@ class Obstacle
     void clear();
     void add(float y, int state);
     std::array<int, obs_array_size_> getObstacleArray();
+    gap findGap();
 
   private:
     std::array<int, obs_array_size_> obstacleArray_;
@@ -34,6 +42,7 @@ class ObstaclePair
     void moveObs();
     void add(geometry_msgs::Vector3 pos, double angle, double range);
     std::array<int, obs_array_size_> getObstacleArray(int i);
+    gap findGap();
 
   private:
     Obstacle obs1_;
@@ -61,4 +70,6 @@ class FlyappyRos
     bool started_ = false;          ///< Whether the game has started, for position normalization
 
     ObstaclePair obs_pair_;         ///< Obstacle pair
+
+    gap current_gap;
 };
