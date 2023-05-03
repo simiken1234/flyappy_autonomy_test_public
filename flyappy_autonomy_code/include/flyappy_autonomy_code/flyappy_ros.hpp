@@ -8,6 +8,8 @@
 
 #include "flyappy_autonomy_code/flyappy.hpp"
 
+const int obs_array_size_ = 32;
+
 geometry_msgs::Vector3 getPoint(geometry_msgs::Vector3 pos, double angle, double range);
 geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angle, float x);
 
@@ -17,10 +19,10 @@ class Obstacle
     Obstacle();
     void clear();
     void add(float y, int state);
-    std::array<int, 32> getObstacleArray();
+    std::array<int, obs_array_size_> getObstacleArray();
 
   private:
-    std::array<int, 32> obstacleArray_;
+    std::array<int, obs_array_size_> obstacleArray_;
 };
 
 class ObstaclePair
@@ -30,7 +32,7 @@ class ObstaclePair
     void clear();
     void moveObs();
     void add(geometry_msgs::Vector3 pos, double angle, double range);
-    std::array<int, 32> getObstacleArray(int i);
+    std::array<int, obs_array_size_> getObstacleArray(int i);
 
   private:
     Obstacle obs1_;

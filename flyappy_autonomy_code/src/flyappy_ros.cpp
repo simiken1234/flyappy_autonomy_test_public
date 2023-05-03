@@ -9,6 +9,7 @@ const float y_max = 3.8f;     // Approx max height
 
 const float obs_width = 0.5f; // Approx obstacle width
 const float obs_spacing = 1.92f; // Approx obstacle spacing
+const float obs_gap = 0.5f;  // The gap between upper and lower obstacle
 
 //------------------------------------------------------------------------------
 // GENERAL FUNCTIONS
@@ -42,7 +43,7 @@ geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angl
 
 Obstacle::Obstacle() 
 {
-    // Obstacle represents the pipe by discretizing it into a 32 element array
+    // Obstacle represents the pipe by discretizing it into a obs_array_size_ element array
     // Array elements represent know state at each y-position
     // 0 = no obstacle, 1 = obstacle, 2 = unknown
     clear();
@@ -56,7 +57,7 @@ void Obstacle::clear()
 void Obstacle::add(float y, int state) 
 {
     // Convert y to array index
-    int i = (int)std::round((y / y_max) * 31.0f);
+    int i = (int)std::round((y / y_max) * float(obs_array_size_ - 1));
 
     // Only change state if it isn't already known to be obstacle
     if (obstacleArray_[i] != 1)
@@ -65,7 +66,7 @@ void Obstacle::add(float y, int state)
     }
 }
 
-std::array<int, 32> Obstacle::getObstacleArray() 
+std::array<int, obs_array_size_> Obstacle::getObstacleArray() 
 {
     return obstacleArray_;
 }
@@ -119,7 +120,7 @@ void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range)
     }
 }
 
-std::array<int, 32> ObstaclePair::getObstacleArray(int i) 
+std::array<int, obs_array_size_> ObstaclePair::getObstacleArray(int i) 
 {
     if (i == 1)
     {
