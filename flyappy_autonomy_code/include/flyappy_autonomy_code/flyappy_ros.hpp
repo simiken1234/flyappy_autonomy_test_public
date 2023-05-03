@@ -8,6 +8,9 @@
 
 #include "flyappy_autonomy_code/flyappy.hpp"
 
+geometry_msgs::Vector3 getPoint(geometry_msgs::Vector3 pos, double angle, double range);
+geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angle, float x);
+
 class Obstacle 
 {
   public:

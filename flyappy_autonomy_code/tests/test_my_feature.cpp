@@ -3,6 +3,46 @@
 #include "flyappy_autonomy_code/flyappy.hpp"
 #include "flyappy_autonomy_code/flyappy_ros.hpp"
 
+TEST(GeneralFunctions, getPoint)
+{
+    geometry_msgs::Vector3 pos;
+    pos.x = 0.0;
+    pos.y = 0.0;
+    double angle = 0.0;
+    double range = 3.0;
+
+    geometry_msgs::Vector3 point = getPoint(pos, angle, range);
+
+    ASSERT_EQ(point.x, 3.0);
+    ASSERT_EQ(point.y, 0.0);
+
+    angle = 1.5708;
+    point = getPoint(pos, angle, range);
+
+    ASSERT_NEAR(point.x, 0.0, 0.0001);
+    ASSERT_NEAR(point.y, 3.0, 0.0001);
+}
+
+TEST(GeneralFunctions, getIntersectPoint)
+{
+    geometry_msgs::Vector3 pos;
+    pos.x = 0.0;
+    pos.y = 0.0;
+    double angle = 0.0;
+    float x = 3.0;
+
+    geometry_msgs::Vector3 point = getIntersectPoint(pos, angle, x);
+
+    ASSERT_EQ(point.x, 3.0);
+    ASSERT_EQ(point.y, 0.0);
+
+    angle = 0.785398;
+    point = getIntersectPoint(pos, angle, x);
+
+    ASSERT_NEAR(point.x, 3.0, 0.0001);
+    ASSERT_NEAR(point.y, 3.0, 0.0001);
+}
+
 TEST(ObstaclePair, AddFreeObs1)
 {
     ObstaclePair obs_pair;
