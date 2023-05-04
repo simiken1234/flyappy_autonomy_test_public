@@ -41,7 +41,7 @@ class ObstaclePair
     ObstaclePair();
     void clear();
     void moveObs();
-    void add(geometry_msgs::Vector3 pos, double angle, double range);
+    void add(geometry_msgs::Vector3 pos, double angle, double range, bool print);
     std::array<int, obs_array_size_> getObstacleArray(int i);
     gap findGap();
 
@@ -72,5 +72,5 @@ class FlyappyRos
 
     ObstaclePair obs_pair_;         ///< Obstacle pair
 
-    gap current_gap;
+    gap current_gap_;
 };

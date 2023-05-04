@@ -7,7 +7,7 @@ const double max_laser_range = 3.550000; // Known max laser range
 const float y_init = 1.555f;   // Approx initial height
 const float y_max = y_max_;     // Approx max height
 
-const float obs_width = 0.5f; // Approx obstacle width
+const float obs_width = 0.7f; // Approx obstacle width
 const float obs_spacing = 1.92f; // Approx obstacle spacing
 const float obs_gap = 0.5f;  // The gap between upper and lower obstacle
 const int obs_gap_i = (int)std::ceil((obs_gap / y_max) * float(obs_array_size_)) - 2; // The gap between upper and lower obstacle in array index
@@ -40,7 +40,6 @@ geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angl
 
 int getGapQuality(int unknown_count, int free_count)
 {
-    //ROS_INFO("Unknown count: %i, Free count: %i", unknown_count, free_count);
     // Check if gap is sufficiently big
     if ((unknown_count + free_count) >= obs_gap_i)
     {
@@ -140,9 +139,6 @@ gap Obstacle::findGap()
         ROS_INFO("No suitable gap found, resetting measurements");
         clear();
     }
-
-    //std::cout<<"Best gap y: "<<best_gap_y<<std::endl;
-    //std::cout<<"Best gap quality: "<<best_gap_quality<<std::endl;
     return {best_gap_y, best_gap_quality};
 }
 
@@ -174,7 +170,7 @@ void ObstaclePair::moveObs()
     obs2_.clear();
 }
 
-void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range) 
+void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range, bool print) 
 {
     // Calculate coordinate of laser impact
     geometry_msgs::Vector3 impact_point = getPoint(pos, angle, range);
@@ -182,18 +178,22 @@ void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range)
     // Find which obstacle the point belongs to
     if ((obs_spacing - obs_width) <= impact_point.x && impact_point.x <= obs_spacing)
     {
+        if (print){ROS_INFO("o1-s1");}
         obs1_.add(impact_point.y, 1);
     }
     else if (impact_point.x > obs_spacing)
     {   
         geometry_msgs::Vector3 intersect_point = getIntersectPoint(pos, angle, (obs_spacing - (0.5*obs_width)));
+        if (print){ROS_INFO("o1-s0");}
         obs1_.add(intersect_point.y, 0);
         if (((2*obs_spacing) - obs_width) <= impact_point.x && impact_point.x <= (2*obs_spacing) && range < max_laser_range)
         {
+            if (print){ROS_INFO("o2-s1");}
             obs2_.add(impact_point.y, 1);
         }
         else if (impact_point.x > (2*obs_spacing))
         {
+            if (print){ROS_INFO("o2-s0");}
             intersect_point = getIntersectPoint(pos, angle, ((2*obs_spacing) - (0.5*obs_width)));
             obs2_.add(intersect_point.y, 0);
         }
@@ -236,7 +236,7 @@ FlyappyRos::FlyappyRos(ros::NodeHandle& nh)
 {
     pos_.x = 0;
     pos_.y = y_init;
-    current_gap = {y_max / 2, 0};
+    current_gap_ = {y_max / 2, 0};
     obs_pair_.clear();
 }
 
@@ -248,8 +248,6 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
     acc_cmd.x = 0;
     acc_cmd.y = 0;
     pub_acc_cmd_.publish(acc_cmd);
-
-    //ROS_INFO("Velocity: %f, %f", msg->x, msg->y);
 
     // Calculate position of Flyappy
     pos_.x += msg->x * dt;
@@ -270,11 +268,37 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
         pos_.x = std::fmod(pos_.x, obs_spacing);
     }
 
-    ROS_INFO("y - position: %f", pos_.y); 
+    if (pos_.y > current_gap_.y)
+        {
+            geometry_msgs::Vector3 acc_cmd;
+            acc_cmd.x = 0;
+            if (msg->y >= 0){
+                acc_cmd.y = -35;
+            }
+            else
+            {
+                acc_cmd.y = 0;
+            }
+            //pub_acc_cmd_.publish(acc_cmd);
+        }
+        else if (pos_.y < current_gap_.y)
+        {
+            geometry_msgs::Vector3 acc_cmd;
+            acc_cmd.x = 0;
+            if (msg->y <= 0){
+                acc_cmd.y = 35;
+            }
+            else
+            {
+                acc_cmd.y = 0;
+            }
+            //pub_acc_cmd_.publish(acc_cmd);
+        }
 }
 
 void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {   
+    bool print = false;
     geometry_msgs::Vector3 impact_point;
     if (started_)
     {
@@ -284,14 +308,18 @@ void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
             double range = msg->ranges[i];
 
             // Add point to ObstaclePair
-            obs_pair_.add(pos_, angle, range);
+            if (i == 4)
+            {
+                print = true;
+            }
+            obs_pair_.add(pos_, angle, range, print);
+            print = false;
         }
 
         // Update current_gap with new info
-        current_gap = obs_pair_.findGap();
-        ROS_INFO("Current gap y: %f, quality: %i", current_gap.y, current_gap.quality);
+        current_gap_ = obs_pair_.findGap();
+        //ROS_INFO("Gap y: %f, y pos: %f, q: %i, ", current_gap_.y, pos_.y, current_gap_.quality);
     }
-    //ROS_INFO("Laser range: %f, angle: %f", msg->ranges[4], (msg->angle_min + (msg->angle_increment * 4)));
 }
 
 void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
