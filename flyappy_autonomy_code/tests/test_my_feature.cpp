@@ -86,16 +86,59 @@ TEST(Obstacle, findGapPartUnknown)
     Obstacle obs;
     std::array<int, obs_array_size_> new_obs_array;
     new_obs_array.fill(1);
-    for (int i = 0; i < 50; i++)
+    for (int i = 0; i < 40; i++)
     {
         new_obs_array[i] = 2;
     }
     obs.setObstacleArray(new_obs_array);
     gap g = obs.findGap();
 
-    float y_exp = (y_max_/float(obs_array_size_)) * 25.0f;
+    float y_exp = (y_max_/float(obs_array_size_)) * 20.0f;
     ASSERT_NEAR(g.y, y_exp, gap_y_tolerance);
-    ASSERT_EQ(g.quality, 50);
+    ASSERT_EQ(g.quality, 40);
+}
+
+TEST(Obstacle, findGapComplex)
+{
+    Obstacle obs;
+    std::array<int, obs_array_size_> new_obs_array;
+    new_obs_array.fill(1);
+
+    // Caluclate minimum gap size (copied from flyappy_ros)
+    const float obs_gap = 0.5f;
+    const int obs_gap_i = (int)std::ceil((obs_gap / y_max_) * float(obs_array_size_)) - 2;
+
+    // Known free gap but too small
+    for (int i = 0; i < (obs_gap_i - 1); i++)
+    {
+        new_obs_array[i+5] = 0;
+    }
+    obs.setObstacleArray(new_obs_array);
+    gap g = obs.findGap();
+
+    ASSERT_EQ(g.quality, 0);
+    // Obstacle will have reset measurements
+
+    // Unknown gap but big enough
+    for (int i = 0; i < (obs_gap_i + 1); i++)
+    {
+        new_obs_array[i+10+obs_gap_i] = 2;
+    }
+    obs.setObstacleArray(new_obs_array);
+    g = obs.findGap();
+
+    float y_exp = (y_max_/float(obs_array_size_)) * (10.0f + float(obs_gap_i) + float(obs_gap_i)/2.0f);
+    ASSERT_NEAR(g.y, y_exp, gap_y_tolerance);
+    ASSERT_EQ(g.quality, obs_gap_i+1);
+
+    // Add a couple new free measuremnts to change the quality but not position
+    new_obs_array[10+obs_gap_i+1] = 0;
+    new_obs_array[10+obs_gap_i+2] = 0;
+    obs.setObstacleArray(new_obs_array);
+    g = obs.findGap();
+
+    ASSERT_EQ(g.quality, obs_gap_i-1 + (obs_array_size_ * 2));
+    ASSERT_NEAR(g.y, y_exp, gap_y_tolerance);
 }
 
 TEST(ObstaclePair, AddFreeObs1)

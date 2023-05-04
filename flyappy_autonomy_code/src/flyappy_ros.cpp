@@ -114,7 +114,7 @@ gap Obstacle::findGap()
                 {
                     // If gap is the best found yet, update best
                     best_gap_quality = current_gap_quality;
-                    best_gap_y = (float(i) - (float(free_count + unknown_count) / 2)) * (y_max / float(obs_array_size_)); 
+                    best_gap_y = (float(i - 1) - (float(free_count + unknown_count) / 2)) * (y_max / float(obs_array_size_)); 
                     // y is for middle of the gap
                 }
 
