@@ -2,7 +2,7 @@
 
 constexpr uint32_t QUEUE_SIZE = 5u;
 const float dt = 1.0f/30.0f;  // Time step at 30Hz
-const double max_laser_range = 3.550000; // Known max laser range
+const double max_laser_range = 3.50000; // Known max laser range - 0.05 for margin
 
 const float y_init = 1.555f;   // Approx initial height
 const float y_max = y_max_;     // Approx max height
@@ -279,9 +279,9 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
             {
                 acc_cmd.y = 0;
             }
-            //pub_acc_cmd_.publish(acc_cmd);
+            pub_acc_cmd_.publish(acc_cmd);
         }
-        else if (pos_.y < current_gap_.y)
+    else if (pos_.y < current_gap_.y)
         {
             geometry_msgs::Vector3 acc_cmd;
             acc_cmd.x = 0;
@@ -292,7 +292,7 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
             {
                 acc_cmd.y = 0;
             }
-            //pub_acc_cmd_.publish(acc_cmd);
+            pub_acc_cmd_.publish(acc_cmd);
         }
 }
 
@@ -341,4 +341,90 @@ void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
     flyappy_ = {};
 
     obs_pair_.clear();
+}
+
+std::vector<double> FlyappyRos::getYVelSequence(double y_vel_init, double y_target)
+{
+    double dist_cur = 0.0d; // For tracking distance travelled
+
+    // Normalize distance and velocity to units of 1 maximum acceleration
+    double dist_target = (y_target - pos_.y) / max_acc_y_;
+    y_vel_init = y_vel_init / max_acc_y_;
+
+    // Create optimal sequence of velocities
+    std::vector<double> vel_seq;
+    vel_seq.push_back(y_vel_init);
+    int y_vel_int = std::floor(y_vel_init);
+
+    if (y_vel_init != 0)
+    {
+        // First fill with deceleration from current vel to zero
+        vel_seq.push_back(y_vel_int); // Highest velocity first
+        dist_cur += (y_vel_int);
+
+        while(y_vel_int > 0)
+        {
+            y_vel_int--;
+            vel_seq.push_back(y_vel_int);
+            dist_cur += (y_vel_int);
+        }
+    }
+    
+    // With the deceleration sorted, check how much distance left
+    double dist_left = dist_target - dist_cur;
+
+    // Special case for no distance left
+    if (dist_left == 0)
+    {
+        return vel_seq;
+    }
+
+    // Special case for negative distance left
+    if (dist_left < 0)
+    {
+        // We can accelerate even more backwards, but we have to check to make sure we dont overshoot in that case
+    }
+
+    // If positive distance left (default case) try to accelerate
+
+    // Get the max int currently in the vector
+    int vel_int_max;
+    if (y_vel_init == 0)
+    {
+        // 0 is special case, since there is then only one element in the vector
+        vel_int_max = 0;
+    }
+    else
+    {
+        vel_int_max = vel_seq[1];
+    }
+
+    // If we are going to accelerate by more than 1 full unit, we need to decelerate back from it as well
+    // Therefore, while dist left fulfils the condition below, we can keep going faster
+    while (dist_left >= 2 * (vel_int_max + 1))
+    {
+        vel_seq.insert(vel_seq.begin() + 1, vel_int_max + 1);
+        vel_seq.insert(vel_seq.begin() + 1, vel_int_max + 1);
+        dist_left -= 2 * (vel_int_max + 1);
+        vel_int_max += 1;
+    }
+
+    // After the previous sequence, we will have reached maximum velocity.
+    // If there is still an integer left in dist_left, we can put it into the sequence next to the last matching integer
+    // Last because this will be a slower than max velocity, so we want to delay it for as long as possible
+    int dist_left_floor = std::floor(dist_left);
+
+    // Find the first matching integer from the back of the sequence
+    int i_match = vel_seq.size() - 1;
+    while (vel_seq[i_match] != dist_left_floor)
+    {
+        i_match--;
+    }
+    // Fit the rest of the distance before that integer
+    vel_seq.insert(vel_seq.begin() + i_match, dist_left);
+
+    // TODO: if there is a pair of integers right after the first float, you can put part of the decimal part of the rest of the dist
+    //      on the first of that pair of integers, resulting in faster speed. This is a special case, so it is not implemented yet.
+
+    return vel_seq;
 }

@@ -65,12 +65,13 @@ class FlyappyRos
     ros::Subscriber sub_laser_scan_;  ///< Subscriber for laser scan
     ros::Subscriber sub_game_ended_;  ///< Subscriber for crash detection
 
+    std::vector<double> getYVelSequence(double y_vel_init, double y_target);
+
     Flyappy flyappy_;  ///< ROS-free main code
-
     geometry_msgs::Vector3 pos_;    ///< Position 
+    double max_acc_y_ = 35.0d;      ///< Maximum acceleration in y direction
+    double max_acc_x_ = 3.0d;      ///< Maximum acceleration in x direction
     bool started_ = false;          ///< Whether the game has started, for position normalization
-
     ObstaclePair obs_pair_;         ///< Obstacle pair
-
     gap current_gap_;
 };
