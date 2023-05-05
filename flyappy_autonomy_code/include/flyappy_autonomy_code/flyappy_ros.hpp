@@ -54,6 +54,12 @@ class FlyappyRos
 {
   public:
     FlyappyRos(ros::NodeHandle& nh);
+    FlyappyRos(); // For testing
+
+    std::vector<double> getYVelSequence(double y_vel_init, double y_target);
+    void setPos(geometry_msgs::Vector3 pos);
+    double getMaxAccX();
+    double getMaxAccY();
 
   private:
     void velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg);
@@ -64,8 +70,6 @@ class FlyappyRos
     ros::Subscriber sub_vel_;         ///< Subscriber for velocity
     ros::Subscriber sub_laser_scan_;  ///< Subscriber for laser scan
     ros::Subscriber sub_game_ended_;  ///< Subscriber for crash detection
-
-    std::vector<double> getYVelSequence(double y_vel_init, double y_target);
 
     Flyappy flyappy_;  ///< ROS-free main code
     geometry_msgs::Vector3 pos_;    ///< Position 

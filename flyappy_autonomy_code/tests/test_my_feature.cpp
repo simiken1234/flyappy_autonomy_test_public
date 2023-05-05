@@ -153,7 +153,7 @@ TEST(ObstaclePair, AddFreeObs1)
     double angle = 0.0;
     double range = 3.0;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     // Check that the free reading has been added to obs1_ correctly
     std::array<int, obs_array_size_> expected_obs;
@@ -177,7 +177,7 @@ TEST(ObstaclePair, AddObstacleAfterFreeObs1)
     double angle = 0.0;
     double range = 3.0;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     // Check that the free reading has been added to obs1_ correctly
     std::array<int, obs_array_size_> expected_obs;
@@ -195,7 +195,7 @@ TEST(ObstaclePair, AddObstacleAfterFreeObs1)
     angle = 0.0;
     range = 1.8;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     // Check that the obstacle has been added to obs1_ correctly
     expected_obs[obs_array_size_ - 1] = 1;
@@ -216,7 +216,7 @@ TEST(ObstaclePair, AddFreeAfterObstacleObs1)
     double angle = 0.0;
     double range = 3.0;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     // Check that the free reading has been added to obs1_ correctly
     std::array<int, obs_array_size_> expected_obs;
@@ -233,7 +233,7 @@ TEST(ObstaclePair, AddFreeAfterObstacleObs1)
     angle = 0.0;
     range = 1.8;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     // Check that the obstacle has been added to obs1_ correctly
     expected_obs[obs_array_size_ - 1] = 1;
@@ -247,7 +247,7 @@ TEST(ObstaclePair, AddFreeAfterObstacleObs1)
     angle = 0.0;
     range = 3.0;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     obs1Array = obs_pair.getObstacleArray(1);
     ASSERT_TRUE(obs1Array == expected_obs);
@@ -273,7 +273,7 @@ TEST(ObstaclePair, AddFreeObstacleFreeObs2)
     double angle = 0.0;
     double range = 3.0;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     expected_obs[obs_array_size_ - 1] = 0;
     obs2Array = obs_pair.getObstacleArray(2);
@@ -284,7 +284,7 @@ TEST(ObstaclePair, AddFreeObstacleFreeObs2)
     angle = 0.0;
     range = 1.82;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     expected_obs[obs_array_size_ - 1] = 1;
     obs2Array = obs_pair.getObstacleArray(2);
@@ -295,7 +295,7 @@ TEST(ObstaclePair, AddFreeObstacleFreeObs2)
     angle = 0.0;
     range = 3.0;
 
-    obs_pair.add(pos, angle, range);
+    obs_pair.add(pos, angle, range, false);
 
     obs2Array = obs_pair.getObstacleArray(2);
     ASSERT_TRUE(obs2Array == expected_obs);
@@ -313,11 +313,11 @@ TEST(ObstaclePair, moveObs)
 
         double angle = 0.0;
         double range = 2.4;
-        obs_pair.add(pos, angle, range);
+        obs_pair.add(pos, angle, range, false);
 
         range = 3.0;
         angle = 0.485;
-        obs_pair.add(pos, angle, range);
+        obs_pair.add(pos, angle, range, false);
 
         // Save contents of obs2
         std::array<int, obs_array_size_> obs2Array = obs_pair.getObstacleArray(2);
@@ -336,6 +336,138 @@ TEST(ObstaclePair, moveObs)
 
         // Check that obs2 array is all set to unknown
         ASSERT_TRUE(obs2Array == clearArray);
+}
+
+TEST(FlyappyRos, getYVelSequence_StartWithoutVel)
+{
+    FlyappyRos f;
+    geometry_msgs::Vector3 pos;
+    pos.x = 0.0;
+    pos.y = 0.0;
+    f.setPos(pos);
+    double max_acc_y = f.getMaxAccY();
+
+    double y_target = max_acc_y;
+    double y_vel = 0.0d;
+
+    std::vector<double> exp_seq = {0.0d, 1.0d, 0.0d};
+    std::vector<double> y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    ASSERT_EQ(y_vel_seq, exp_seq);
+
+    y_target = max_acc_y + 0.5d;
+
+    exp_seq = {0.0d, 1.0d, (y_target - max_acc_y)/max_acc_y, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    for (int i = 0; i < exp_seq.size(); i++)
+    {
+        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
+    }
+
+    y_target = 3.5d * max_acc_y;
+
+    exp_seq = {0.0d, 1.0d, 1.5d, 1.0d, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    ASSERT_EQ(y_vel_seq, exp_seq);
+
+    y_target = 6.5d * max_acc_y;
+
+    exp_seq = {0.0d, 1.0d, 2.0d, 2.0d, 1.0d, 0.5d, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    ASSERT_EQ(exp_seq, y_vel_seq);
+
+    y_target = 19.3d * max_acc_y;
+
+    exp_seq = {0.0d, 1.0d, 2.0d, 3.0d, 4.0d, 3.3d, 3.0d, 2.0d, 1.0d, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    for (int i = 0; i < exp_seq.size(); i++)
+    {
+        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
+    }
+}
+
+TEST(FlyappyRos, getYVelSequence_StartWithVel_DecelOnly)
+{
+    FlyappyRos f;
+    geometry_msgs::Vector3 pos;
+    pos.x = 0.0;
+    pos.y = 0.0;
+    f.setPos(pos);
+    double max_acc_y = f.getMaxAccY();
+
+    double y_target = max_acc_y;
+    double y_vel = max_acc_y;
+
+    std::vector<double> exp_seq = {1.0d, 1.0d, 0.0d};
+    std::vector<double> y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    ASSERT_EQ(y_vel_seq, exp_seq);
+
+    y_target = max_acc_y + 0.5d;
+    y_vel = max_acc_y;
+
+    exp_seq = {1.0d, 1.0d, (y_target - max_acc_y)/max_acc_y, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    for (int i = 0; i < exp_seq.size(); i++)
+    {
+        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
+    }
+
+    y_vel = max_acc_y + 0.5d;
+    y_target = max_acc_y;
+
+    exp_seq = {y_vel/max_acc_y, 1.0d, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    for (int i = 0; i < exp_seq.size(); i++)
+    {
+        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
+    }
+}
+
+TEST(FlyappyRos, getYVelSequence_StartWithVel_WithAccel)
+{
+    FlyappyRos f;
+    geometry_msgs::Vector3 pos;
+    pos.x = 0.0;
+    pos.y = 0.0;
+    f.setPos(pos);
+    double max_acc_y = f.getMaxAccY();
+
+    double y_target = max_acc_y;
+    double y_vel = max_acc_y;
+
+    std::vector<double> exp_seq = {1.0d, 1.0d, 0.0d};
+    std::vector<double> y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    ASSERT_EQ(y_vel_seq, exp_seq);
+
+    y_target = max_acc_y + 0.5d;
+    y_vel = max_acc_y;
+
+    exp_seq = {1.0d, 1.0d, (y_target - max_acc_y)/max_acc_y, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    for (int i = 0; i < exp_seq.size(); i++)
+    {
+        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
+    }
+
+    y_vel = max_acc_y + 0.5d;
+    y_target = max_acc_y;
+
+    exp_seq = {y_vel/max_acc_y, 1.0d, 0.0d};
+    y_vel_seq = f.getYVelSequence(y_vel, y_target);
+
+    for (int i = 0; i < exp_seq.size(); i++)
+    {
+        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
+    }
 }
 
 int main(int argc, char** argv)

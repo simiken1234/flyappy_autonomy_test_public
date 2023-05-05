@@ -240,6 +240,15 @@ FlyappyRos::FlyappyRos(ros::NodeHandle& nh)
     obs_pair_.clear();
 }
 
+FlyappyRos::FlyappyRos()
+{
+    // For testing
+    pos_.x = 0;
+    pos_.y = y_init;
+    current_gap_ = {y_max / 2, 0};
+    obs_pair_.clear();
+}
+
 void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
 {
     // Example of publishing acceleration command to Flyappy
@@ -345,41 +354,34 @@ void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
 
 std::vector<double> FlyappyRos::getYVelSequence(double y_vel_init, double y_target)
 {
-    double dist_cur = 0.0d; // For tracking distance travelled
-
     // Normalize distance and velocity to units of 1 maximum acceleration
     double dist_target = (y_target - pos_.y) / max_acc_y_;
+    double dist_left = dist_target; // For tracking distance travelled
     y_vel_init = y_vel_init / max_acc_y_;
 
     // Create optimal sequence of velocities
     std::vector<double> vel_seq;
     vel_seq.push_back(y_vel_init);
     int y_vel_int = std::floor(y_vel_init);
-
-    if (y_vel_init != 0)
-    {
-        // First fill with deceleration from current vel to zero
-        vel_seq.push_back(y_vel_int); // Highest velocity first
-        dist_cur += (y_vel_int);
-
-        while(y_vel_int > 0)
-        {
-            y_vel_int--;
-            vel_seq.push_back(y_vel_int);
-            dist_cur += (y_vel_int);
-        }
-    }
     
-    // With the deceleration sorted, check how much distance left
-    double dist_left = dist_target - dist_cur;
+    // First fill with deceleration from current vel to zero
+    vel_seq.push_back(y_vel_int); // Highest velocity first
+    dist_left -= (y_vel_int);
 
-    // Special case for no distance left
+    while(y_vel_int > 0)
+    {
+        y_vel_int--;
+        vel_seq.push_back(y_vel_int);
+        dist_left -= (y_vel_int);
+    }
+
+    // Special case for no distance left after decel
     if (dist_left == 0)
     {
         return vel_seq;
     }
 
-    // Special case for negative distance left
+    // Special case for negative distance left after decel
     if (dist_left < 0)
     {
         // We can accelerate even more backwards, but we have to check to make sure we dont overshoot in that case
@@ -388,25 +390,42 @@ std::vector<double> FlyappyRos::getYVelSequence(double y_vel_init, double y_targ
     // If positive distance left (default case) try to accelerate
 
     // Get the max int currently in the vector
-    int vel_int_max;
-    if (y_vel_init == 0)
-    {
-        // 0 is special case, since there is then only one element in the vector
-        vel_int_max = 0;
-    }
-    else
-    {
-        vel_int_max = vel_seq[1];
-    }
+    int vel_int_max = vel_seq[1];
+    int i_max;
 
     // If we are going to accelerate by more than 1 full unit, we need to decelerate back from it as well
     // Therefore, while dist left fulfils the condition below, we can keep going faster
     while (dist_left >= 2 * (vel_int_max + 1))
-    {
-        vel_seq.insert(vel_seq.begin() + 1, vel_int_max + 1);
-        vel_seq.insert(vel_seq.begin() + 1, vel_int_max + 1);
+    {   
+        // Find the first instance of the biggest number in the vel_seq, insert (vel_int_max + 1) after it twice
+        i_max = 0;
+        while (vel_seq[i_max] < vel_int_max)
+        {
+            i_max++;
+        }
+        vel_seq.insert(vel_seq.begin() + i_max + 1, vel_int_max + 1);
+        vel_seq.insert(vel_seq.begin() + i_max + 2, vel_int_max + 1);
         dist_left -= 2 * (vel_int_max + 1);
-        vel_int_max += 1;
+        vel_int_max++;
+    }
+
+    // If dist_left is equal to between (vel_int_max + 1) and 2*(vel_int_max + 1), it cannot be matched to another int
+    if (dist_left >= (vel_int_max + 1))
+    {
+        // Find the first instance of vel_int_max in the vector, insert vel_int_max + 1 after it
+        i_max = 0;
+        while (vel_seq[i_max] != vel_int_max)
+        {
+            i_max++;
+        }
+        vel_seq.insert(vel_seq.begin() + i_max + 1, vel_int_max + 1);
+        dist_left -= (vel_int_max + 1);
+    }
+
+    // Once again, special case, if there is no distance left, we do not need to continue
+    if (dist_left == 0)
+    {
+        return vel_seq;
     }
 
     // After the previous sequence, we will have reached maximum velocity.
@@ -427,4 +446,19 @@ std::vector<double> FlyappyRos::getYVelSequence(double y_vel_init, double y_targ
     //      on the first of that pair of integers, resulting in faster speed. This is a special case, so it is not implemented yet.
 
     return vel_seq;
+}
+
+void FlyappyRos::setPos(geometry_msgs::Vector3 pos)
+{
+    pos_ = pos;
+}
+
+double FlyappyRos::getMaxAccY()
+{
+    return max_acc_y_;
+}
+
+double FlyappyRos::getMaxAccX()
+{
+    return max_acc_x_;
 }
