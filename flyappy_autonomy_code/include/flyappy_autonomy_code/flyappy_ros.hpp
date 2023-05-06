@@ -10,6 +10,7 @@
 
 const int y_max_ = 4.1f;
 const int obs_array_size_ = int(y_max_ * 20.0f) + 1;
+const float dt_ = 1.0f/30.0f;  // Time step at 30Hz
 
 geometry_msgs::Vector3 getPoint(geometry_msgs::Vector3 pos, double angle, double range);
 geometry_msgs::Vector3 getIntersectPoint(geometry_msgs::Vector3 pos, double angle, float x);
@@ -59,13 +60,15 @@ class FlyappyRos
     std::vector<double> getMaxYDecelSequence(double y_vel, double dist_left);
     std::vector<double> getYVelSequence(geometry_msgs::Vector3 pos, double y_vel_init, double y_target);
     void setPos(geometry_msgs::Vector3 pos);
-    double getMaxAccX();
-    double getMaxAccY();
+    double getMaxAccXDt();
+    double getMaxAccYDt();
 
   private:
     void velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg);
     void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
     void gameEndedCallback(const std_msgs::Bool::ConstPtr& msg);
+
+    void accelCommand();
 
     ros::Publisher pub_acc_cmd_;      ///< Publisher for acceleration command
     ros::Subscriber sub_vel_;         ///< Subscriber for velocity
@@ -75,8 +78,11 @@ class FlyappyRos
     Flyappy flyappy_;  ///< ROS-free main code
     geometry_msgs::Vector3 pos_;    ///< Position 
     double max_acc_y_ = 35.0d;      ///< Maximum acceleration in y direction
-    double max_acc_x_ = 3.0d;      ///< Maximum acceleration in x direction
+    double max_acc_y_dt_ = max_acc_y_ * dt_;    ///< Maximum acceleration in y direction, in a time-step
+    double max_acc_x_ = 3.0d;       ///< Maximum acceleration in x direction
+    double max_acc_x_dt_ = max_acc_x_ * dt_;    ///< Maximum acceleration in x direction, in a time-step
     bool started_ = false;          ///< Whether the game has started, for position normalization
     ObstaclePair obs_pair_;         ///< Obstacle pair
     gap current_gap_;
+    std::vector <double> y_vel_seq_;
 };

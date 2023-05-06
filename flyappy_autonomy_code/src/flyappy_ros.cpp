@@ -1,7 +1,6 @@
 #include "flyappy_autonomy_code/flyappy_ros.hpp"
 
 constexpr uint32_t QUEUE_SIZE = 5u;
-const float dt = 1.0f/30.0f;  // Time step at 30Hz
 const double max_laser_range = 3.50000; // Known max laser range - 0.05 for margin
 
 const float y_init = 1.555f;   // Approx initial height
@@ -259,8 +258,8 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
     pub_acc_cmd_.publish(acc_cmd);
 
     // Calculate position of Flyappy
-    pos_.x += msg->x * dt;
-    pos_.y += msg->y * dt;
+    pos_.x += msg->x * dt_;
+    pos_.y += msg->y * dt_;
 
     // Account for the starting procedure
     if (pos_.x > 4.38f)
@@ -277,7 +276,16 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
         pos_.x = std::fmod(pos_.x, obs_spacing);
     }
 
-    if (pos_.y > current_gap_.y)
+    // Update y-velocity sequence
+    if (started_){
+        y_vel_seq_ = getYVelSequence(pos_, msg->y, current_gap_.y);
+        accelCommand();
+    }
+
+    // Get current y-accel command
+
+
+    /* if (pos_.y > current_gap_.y)
         {
             geometry_msgs::Vector3 acc_cmd;
             acc_cmd.x = 0;
@@ -302,7 +310,7 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
                 acc_cmd.y = 0;
             }
             pub_acc_cmd_.publish(acc_cmd);
-        }
+        } */
 }
 
 void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
@@ -319,7 +327,7 @@ void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
             // Add point to ObstaclePair
             if (i == 4)
             {
-                print = true;
+                print = false;
             }
             obs_pair_.add(pos_, angle, range, print);
             print = false;
@@ -350,6 +358,22 @@ void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
     flyappy_ = {};
 
     obs_pair_.clear();
+}
+
+void FlyappyRos::accelCommand()
+{
+    geometry_msgs::Vector3 acc_cmd;
+    acc_cmd.x = 0;
+    acc_cmd.y = (y_vel_seq_[1] - y_vel_seq_[0]) * max_acc_y_;
+    //print all of the y_vel_seq_
+    for (int i = 0; i < y_vel_seq_.size(); i++)
+    {
+        ROS_INFO("[%i]: %f", i, y_vel_seq_[i]);
+    }
+    ROS_INFO("End. Cmd: %f", acc_cmd.y);
+
+    // Publish command
+    pub_acc_cmd_.publish(acc_cmd);
 }
 
 std::vector<double> FlyappyRos::getMaxYDecelSequence(double y_vel, double dist_left)
@@ -384,9 +408,9 @@ std::vector<double> FlyappyRos::getMaxYDecelSequence(double y_vel, double dist_l
 std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, double y_vel_init, double y_target)
 {
     // Normalize distance and velocity to units of 1 maximum acceleration
-    double dist_target = (y_target - pos.y) / max_acc_y_;
+    double dist_target = (y_target - pos.y) / max_acc_y_dt_;
     double dist_left = dist_target; // For tracking distance travelled
-    y_vel_init = y_vel_init / max_acc_y_;
+    y_vel_init = y_vel_init / max_acc_y_dt_;
 
     int vel_sign_init = (y_vel_init >= 0) ? 1 : -1;
     int dist_sign_init = (dist_target >= 0) ? 1 : -1;
@@ -403,9 +427,9 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         // Update pos and y_vel_init
         for (int i = 1; i < vel_seq.size(); i++)
         {
-            pos.y += vel_seq[i] * max_acc_y_;
+            pos.y += vel_seq[i] * max_acc_y_dt_ * dt_;
         }
-        y_vel_init = vel_seq.back() * max_acc_y_;
+        y_vel_init = vel_seq.back() * max_acc_y_dt_;
         vel_seq.pop_back(); // This value will be added back by the recursive call
 
         // Recursive call to finish the rest of the sequence
@@ -432,13 +456,13 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
     
     // First fill with deceleration from current vel to zero
     vel_seq.push_back(y_vel_int); // Highest velocity first
-    dist_left -= (y_vel_int);
+    dist_left -= (y_vel_int * dt_);
 
     while(y_vel_int != 0)
     {
         y_vel_int -= vel_sign_init * 1;
         vel_seq.push_back(y_vel_int);
-        dist_left -= y_vel_int;
+        dist_left -= y_vel_int * dt_;
     }
 
     // Special case for no distance left after decel
@@ -455,7 +479,7 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         // Update pos
         for (int i = 1; i < vel_seq.size(); i++) // Start at 1 to skip the first value which is just the speed at start
         {
-            pos.y += vel_seq[i] * max_acc_y_;
+            pos.y += vel_seq[i] * max_acc_y_dt_ * dt_;
         }
 
         // Check if we are done
@@ -466,7 +490,7 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         }
 
         // If not done, update y_vel_init and call function again
-        y_vel_init = vel_seq.back() * max_acc_y_;
+        y_vel_init = vel_seq.back() * max_acc_y_dt_ * dt_;
         vel_seq.pop_back(); // This value will be added back by the recursive call
 
         // Recursive call to finish the rest of the sequence if not done
@@ -487,7 +511,7 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
 
     // If we are going to accelerate by more than 1 full unit, we need to decelerate back from it as well
     // Therefore, while dist left fulfils the condition below, we can keep going faster
-    while (std::abs(dist_left) >= std::abs(2 * (vel_int_max + (vel_sign_init))))
+    while (std::abs(dist_left) >= std::abs(2 * (vel_int_max + vel_sign_init) * dt_))
     {   
         // Find the first instance of the biggest number in the vel_seq, insert (vel_int_max + 1) after it twice
         i_max = 0;
@@ -498,11 +522,11 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         vel_int_max += (vel_sign_init * 1);
         vel_seq.insert(vel_seq.begin() + i_max + 1, vel_int_max);
         vel_seq.insert(vel_seq.begin() + i_max + 2, vel_int_max);
-        dist_left -= 2 * vel_int_max;
+        dist_left -= 2 * vel_int_max * dt_;
     }
 
     // If dist_left is equal to between (vel_int_max + 1) and 2*(vel_int_max + 1), we need to add one more acceleration
-    if (std::abs(dist_left) >= std::abs(vel_int_max + vel_sign_init))
+    if (std::abs(dist_left) >= std::abs((vel_int_max + vel_sign_init) * dt_))
     {
         // Find the first instance of vel_int_max in the vector, insert vel_int_max + 1 after it
         i_max = 0;
@@ -512,7 +536,7 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         }
         vel_int_max += (vel_sign_init * 1);
         vel_seq.insert(vel_seq.begin() + i_max + 1, vel_int_max);
-        dist_left -= vel_int_max;
+        dist_left -= vel_int_max * dt_;
     }
 
     // Once again, special case, if there is no distance left, we do not need to continue
@@ -554,12 +578,12 @@ void FlyappyRos::setPos(geometry_msgs::Vector3 pos)
     pos_ = pos;
 }
 
-double FlyappyRos::getMaxAccY()
+double FlyappyRos::getMaxAccYDt()
 {
-    return max_acc_y_;
+    return max_acc_y_dt_;
 }
 
-double FlyappyRos::getMaxAccX()
+double FlyappyRos::getMaxAccXDt()
 {
-    return max_acc_x_;
+    return max_acc_x_dt_;
 }
