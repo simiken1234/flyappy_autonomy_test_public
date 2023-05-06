@@ -69,7 +69,7 @@ class FlyappyRos
     void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
     void gameEndedCallback(const std_msgs::Bool::ConstPtr& msg);
 
-    void accelCommand(double x_vel);
+    void accelCommand(double x_vel, double y_vel);
 
     ros::Publisher pub_acc_cmd_;      ///< Publisher for acceleration command
     ros::Subscriber sub_vel_;         ///< Subscriber for velocity
