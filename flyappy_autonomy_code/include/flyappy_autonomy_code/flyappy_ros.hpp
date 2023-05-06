@@ -5,6 +5,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/LaserScan.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Int32.h>  // Didnt use to be here
 
 #include "flyappy_autonomy_code/flyappy.hpp"
 
@@ -67,9 +68,9 @@ class FlyappyRos
   private:
     void velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg);
     void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
-    void gameEndedCallback(const std_msgs::Bool::ConstPtr& msg);
+    void gameEndedCallback(const std_msgs::Int32::ConstPtr& msg);  // Used to be Bool
 
-    void accelCommand(double x_vel);
+    void accelCommand(double x_vel, double y_vel);
 
     ros::Publisher pub_acc_cmd_;      ///< Publisher for acceleration command
     ros::Subscriber sub_vel_;         ///< Subscriber for velocity
@@ -88,4 +89,5 @@ class FlyappyRos
     gap next_gap_;
     std::vector <double> y_vel_seq_;
     std::vector <double> y_vel_seq_next_;
+    std::vector <double> scores_;
 };

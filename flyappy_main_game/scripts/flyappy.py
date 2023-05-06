@@ -13,6 +13,7 @@ import rospkg
 import rospy
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import Bool
+from std_msgs.msg import Int32
 
 
 from laser import Laser
@@ -207,13 +208,19 @@ def showWelcomeAnimation():
         pygame.display.update()
         FPSCLOCK.tick(FPS)
 
+        return {
+                    'playery': playery + playerShmVals['val'],
+                    'basex': basex,
+                    'playerIndexGen': playerIndexGen,
+                }
+
 
 def mainGame(movementInfo):
     global playerAccX
     global playerAccY
     #define publishers
     pub_velocity = rospy.Publisher('flyappy_vel', Vector3, queue_size=10)
-    pub_game_ended = rospy.Publisher('flyappy_game_ended', Bool, queue_size=2)
+    pub_game_ended = rospy.Publisher('flyappy_game_ended', Int32, queue_size=2)
     # create laser
     laser = Laser(LASERFOV,LASERRES,SCALING)
     score = playerIndex = loopIter = 0
@@ -272,7 +279,7 @@ def mainGame(movementInfo):
                 if countdown > 0:
                     countdown -= 1
                 else:
-                    pub_game_ended.publish(Bool(False))
+                    pub_game_ended.publish(Int32(score))  # was Bool(False)
                     return {
                         'y': playery,
                         'groundCrash': crashTest[1],
@@ -299,7 +306,7 @@ def mainGame(movementInfo):
         crashTest = checkCrash({'x': playerx, 'y': playery, 'index': playerIndex},
                                upperPipes, lowerPipes)
         if crashTest[0]:
-            pub_game_ended.publish(Bool(True))
+            pub_game_ended.publish(Int32(score))  # was Bool(True)
             return {
                 'y': playery,
                 'groundCrash': crashTest[1],
@@ -442,6 +449,8 @@ def showGameOverScreen(crashInfo):
 
         FPSCLOCK.tick(FPS)
         pygame.display.update()
+
+        return
 
 
 def playerShm(playerShm):
