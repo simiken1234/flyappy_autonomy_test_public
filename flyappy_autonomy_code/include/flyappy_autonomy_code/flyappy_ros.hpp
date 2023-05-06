@@ -56,7 +56,8 @@ class FlyappyRos
     FlyappyRos(ros::NodeHandle& nh);
     FlyappyRos(); // For testing
 
-    std::vector<double> getYVelSequence(double y_vel_init, double y_target);
+    std::vector<double> getMaxYDecelSequence(double dist_left, double y_vel);
+    std::vector<double> getYVelSequence(geometry_msgs::Vector3 pos, double y_vel_init, double y_target);
     void setPos(geometry_msgs::Vector3 pos);
     double getMaxAccX();
     double getMaxAccY();
