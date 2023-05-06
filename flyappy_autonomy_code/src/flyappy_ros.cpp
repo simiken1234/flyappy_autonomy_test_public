@@ -6,7 +6,9 @@ const double max_laser_range = 3.50000; // Known max laser range - 0.05 for marg
 const float y_init = 1.555f;   // Approx initial height
 const float y_max = y_max_;     // Approx max height
 
-const float obs_width = 0.9f; // Approx obstacle width          was 0.7
+const float early_accel_offset = 0.2f; // Offset to start accelerating early
+
+const float obs_width = 0.65f; // Approx obstacle width
 const float obs_spacing = 1.92f; // Approx obstacle spacing
 const float obs_gap = 0.5f;  // The gap between upper and lower obstacle
 const int obs_gap_i = (int)std::ceil((obs_gap / y_max) * float(obs_array_size_)) - 2; // The gap between upper and lower obstacle in array index
@@ -273,12 +275,14 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
     pos_.y += msg->y * dt_;
 
     // Account for the starting procedure
-    if (pos_.x > 4.38f)
+    if (pos_.x > 4.38f)   // 4.38 means there is no chance for flappy to hit
     {
         pos_.x -= 4.38f;
         started_ = true;
         obs_pair_.clear();
     }
+
+    ROS_INFO("Position: (%f, %f)", pos_.x, pos_.y);
 
     // Normalize to last pipe (New pipe every 1.92m)
     if (started_ && pos_.x > obs_spacing)
@@ -380,13 +384,16 @@ void FlyappyRos::accelCommand(double x_vel)
 {
     geometry_msgs::Vector3 acc_cmd;
     acc_cmd.x = getXAccelCommand(pos_, x_vel);
-    acc_cmd.y = (y_vel_seq_[1] - y_vel_seq_[0]) * max_acc_y_;
-    //print all of the y_vel_seq_
-    for (int i = 0; i < y_vel_seq_.size(); i++)
+    
+    if (pos_.x >= (obs_spacing - early_accel_offset))
     {
-        //ROS_INFO("[%i]: %f", i, y_vel_seq_[i]);
+        // Start accelerating for the next gate before fully out of the pipe
+        acc_cmd.y += (y_vel_seq_next_[1] - y_vel_seq_next_[0]) * max_acc_y_;
     }
-    //ROS_INFO("End. Cmd: %f", acc_cmd.y);
+    else
+    {
+        acc_cmd.y += (y_vel_seq_[1] - y_vel_seq_[0]) * max_acc_y_;
+    }
 
     // Publish command
     pub_acc_cmd_.publish(acc_cmd);
@@ -595,23 +602,44 @@ double FlyappyRos::getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_ini
     //        0 = current        1 = start of pipe            3 = start of next pipe
     //                                    2 = end of pipe
 
+    // Creating quality parameters for scaling velocities
+
+    double q_1 = current_gap_.quality / double(obs_array_size_ * (obs_gap_i));  // Normalized to maximum quality
+    double q_3 = next_gap_.quality / double(obs_array_size_ * (obs_gap_i));     // But sometimes it is higher than 1 because of additional free detections
+
+    // Make sure that both q_1 and q_3 are within tuneable limits
+    if (q_1 > 0.97){q_1 = 0.97;} // Safety margin
+    else if (q_1 < 0.7){q_1 = 0.7;}
+    if (q_3 > 0.97){q_3 = 0.97;}
+    else if (q_3 < 0.7){q_3 = 0.7;} // q_3 is slowing down too much, especially in pipe
+
     // Q1: How fast can I go at x_2 to reach x_3 at t_3 at constant velocity?
 
     double a;
     double t_3 = (y_vel_seq_next_.size() - 1) * dt_;  // -1 for start vel
     double x_3 = obs_spacing - obs_width;  // x_3 defined relative to x_2
-    double v_2 = x_3 / t_3;
+    double v_2 = (x_3 / t_3) * q_3;
 
     // Q2: How fast can I go now, at x_0, to reach x_1 at t_1 at constant velocity?
 
     // Special case if we are already in pipe
     if (pos.x >= obs_spacing - obs_width)
     {
-        // TODO: Accel and decel in pipe if possible
-
         // Solve for accel command to reach v_2
-        a = v_2 - x_vel_init;
-        if (std::abs(a) > max_acc_x_dt_)
+        a = (v_2 - x_vel_init) / dt_;
+
+        // But are we in the first half of the pipe? If yes, maybe we can accelerate
+        if (pos.x < obs_spacing - (obs_width / 2.0))
+        {
+            // What speed can we decelerate to v_2 from, from the middle of the pipe?
+            double d_decel = (obs_width / 2.0);
+            double t_decel = ((-v_2) + std::sqrt((v_2 * v_2) + (6 * max_acc_x_ * d_decel))) / (3 * max_acc_x_); // quadratic formula
+            double v_decel = v_2 + (max_acc_x_ * t_decel);
+
+            a = (v_decel - x_vel_init) / dt_;
+            }
+       
+        if (std::abs(a) > max_acc_x_)
         {
             a = (a/std::abs(a)) * max_acc_x_; //maintaining the sign
         }
@@ -620,7 +648,7 @@ double FlyappyRos::getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_ini
 
     double t_1 = (y_vel_seq_.size() - 1) * dt_;  // -1 for start vel
     double x_1 = obs_spacing - obs_width - pos.x;  // x_1 defined relative to x_0
-    double v_1 = x_1 / t_1; // So far assuming v_1 = v_0
+    double v_1 = (x_1 / t_1) * q_1; // So far assuming v_1 = v_0
 
     // Q3: Is v_2 limiting v_1?
 
@@ -636,6 +664,7 @@ double FlyappyRos::getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_ini
         }
         if (v_temp > v_2)
         {
+            ROS_INFO("V_2 is limiting v_1");
             // We cant slow down in time. Limit v_1
             v_1 -= (v_temp - v_2);
         }
@@ -643,8 +672,8 @@ double FlyappyRos::getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_ini
     }
 
     // Q4: Now that we have solved for v_1, let's solve for the acceleration command
-    a = v_1 - x_vel_init;
-    if (std::abs(a) > max_acc_x_dt_)
+    a = (v_1 - x_vel_init) / dt_;
+    if (std::abs(a) > max_acc_x_)
     {
         a = (a/std::abs(a)) * max_acc_x_; //maintaining the sign
     }
