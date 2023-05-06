@@ -44,7 +44,7 @@ class ObstaclePair
     void moveObs();
     void add(geometry_msgs::Vector3 pos, double angle, double range, bool print);
     std::array<int, obs_array_size_> getObstacleArray(int i);
-    gap findGap();
+    gap findGap(int i);
 
   private:
     Obstacle obs1_;
@@ -59,6 +59,7 @@ class FlyappyRos
 
     std::vector<double> getMaxYDecelSequence(double y_vel, double dist_left);
     std::vector<double> getYVelSequence(geometry_msgs::Vector3 pos, double y_vel_init, double y_target);
+    double getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_init);
     void setPos(geometry_msgs::Vector3 pos);
     double getMaxAccXDt();
     double getMaxAccYDt();
@@ -68,7 +69,7 @@ class FlyappyRos
     void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg);
     void gameEndedCallback(const std_msgs::Bool::ConstPtr& msg);
 
-    void accelCommand();
+    void accelCommand(double x_vel);
 
     ros::Publisher pub_acc_cmd_;      ///< Publisher for acceleration command
     ros::Subscriber sub_vel_;         ///< Subscriber for velocity
@@ -84,5 +85,7 @@ class FlyappyRos
     bool started_ = false;          ///< Whether the game has started, for position normalization
     ObstaclePair obs_pair_;         ///< Obstacle pair
     gap current_gap_;
+    gap next_gap_;
     std::vector <double> y_vel_seq_;
+    std::vector <double> y_vel_seq_next_;
 };

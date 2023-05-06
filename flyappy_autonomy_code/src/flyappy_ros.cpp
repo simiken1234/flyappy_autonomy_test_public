@@ -6,7 +6,7 @@ const double max_laser_range = 3.50000; // Known max laser range - 0.05 for marg
 const float y_init = 1.555f;   // Approx initial height
 const float y_max = y_max_;     // Approx max height
 
-const float obs_width = 0.7f; // Approx obstacle width
+const float obs_width = 0.9f; // Approx obstacle width          was 0.7
 const float obs_spacing = 1.92f; // Approx obstacle spacing
 const float obs_gap = 0.5f;  // The gap between upper and lower obstacle
 const int obs_gap_i = (int)std::ceil((obs_gap / y_max) * float(obs_array_size_)) - 2; // The gap between upper and lower obstacle in array index
@@ -199,9 +199,20 @@ void ObstaclePair::add(geometry_msgs::Vector3 pos, double angle, double range, b
     }
 }
 
-gap ObstaclePair::findGap()
+gap ObstaclePair::findGap(int i)
 {
-    return obs1_.findGap();
+    if (i == 1)
+    {
+        return obs1_.findGap();
+    }
+    else if (i == 2)
+    {
+        return obs2_.findGap();
+    }
+    else
+    {
+        return {};
+    }
 }
 
 std::array<int, obs_array_size_> ObstaclePair::getObstacleArray(int i) 
@@ -279,7 +290,11 @@ void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
     // Update y-velocity sequence
     if (started_){
         y_vel_seq_ = getYVelSequence(pos_, msg->y, current_gap_.y);
-        accelCommand();
+        geometry_msgs::Vector3 pos_next_gate;
+        pos_next_gate.x = 0;
+        pos_next_gate.y = current_gap_.y;
+        y_vel_seq_next_ = getYVelSequence(pos_next_gate, 0.0d, next_gap_.y);
+        accelCommand(msg->x);
     }
 
     // Get current y-accel command
@@ -327,6 +342,7 @@ void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
             // Add point to ObstaclePair
             if (i == 4)
             {
+                // Debugging feature
                 print = false;
             }
             obs_pair_.add(pos_, angle, range, print);
@@ -334,8 +350,8 @@ void FlyappyRos::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
         }
 
         // Update current_gap with new info
-        current_gap_ = obs_pair_.findGap();
-        //ROS_INFO("Gap y: %f, y pos: %f, q: %i, ", current_gap_.y, pos_.y, current_gap_.quality);
+        current_gap_ = obs_pair_.findGap(1);
+        next_gap_ = obs_pair_.findGap(2);
     }
 }
 
@@ -360,17 +376,17 @@ void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
     obs_pair_.clear();
 }
 
-void FlyappyRos::accelCommand()
+void FlyappyRos::accelCommand(double x_vel)
 {
     geometry_msgs::Vector3 acc_cmd;
-    acc_cmd.x = 0;
+    acc_cmd.x = getXAccelCommand(pos_, x_vel);
     acc_cmd.y = (y_vel_seq_[1] - y_vel_seq_[0]) * max_acc_y_;
     //print all of the y_vel_seq_
     for (int i = 0; i < y_vel_seq_.size(); i++)
     {
-        ROS_INFO("[%i]: %f", i, y_vel_seq_[i]);
+        //ROS_INFO("[%i]: %f", i, y_vel_seq_[i]);
     }
-    ROS_INFO("End. Cmd: %f", acc_cmd.y);
+    //ROS_INFO("End. Cmd: %f", acc_cmd.y);
 
     // Publish command
     pub_acc_cmd_.publish(acc_cmd);
@@ -571,6 +587,68 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
     //      on the first of that pair of integers, resulting in faster speed. This is a special case, so it is not implemented yet.
 
     return vel_seq;
+}
+
+double FlyappyRos::getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_init)
+{
+    //----|   ->                 |--------|                   |--------|       ...
+    //        0 = current        1 = start of pipe            3 = start of next pipe
+    //                                    2 = end of pipe
+
+    // Q1: How fast can I go at x_2 to reach x_3 at t_3 at constant velocity?
+
+    double a;
+    double t_3 = (y_vel_seq_next_.size() - 1) * dt_;  // -1 for start vel
+    double x_3 = obs_spacing - obs_width;  // x_3 defined relative to x_2
+    double v_2 = x_3 / t_3;
+
+    // Q2: How fast can I go now, at x_0, to reach x_1 at t_1 at constant velocity?
+
+    // Special case if we are already in pipe
+    if (pos.x >= obs_spacing - obs_width)
+    {
+        // TODO: Accel and decel in pipe if possible
+
+        // Solve for accel command to reach v_2
+        a = v_2 - x_vel_init;
+        if (std::abs(a) > max_acc_x_dt_)
+        {
+            a = (a/std::abs(a)) * max_acc_x_; //maintaining the sign
+        }
+        return a;
+    }
+
+    double t_1 = (y_vel_seq_.size() - 1) * dt_;  // -1 for start vel
+    double x_1 = obs_spacing - obs_width - pos.x;  // x_1 defined relative to x_0
+    double v_1 = x_1 / t_1; // So far assuming v_1 = v_0
+
+    // Q3: Is v_2 limiting v_1?
+
+    if (v_2 < v_1)
+    {
+        // Can we slow down in time?
+        double x_temp = 0.0d;
+        double v_temp = v_1;
+        while (x_temp < obs_spacing && v_temp > v_2)
+        {
+            x_temp += v_temp * dt_;
+            v_temp -= max_acc_x_dt_ * dt_;
+        }
+        if (v_temp > v_2)
+        {
+            // We cant slow down in time. Limit v_1
+            v_1 -= (v_temp - v_2);
+        }
+        // Otherwise, v_2 is not limiting v_1
+    }
+
+    // Q4: Now that we have solved for v_1, let's solve for the acceleration command
+    a = v_1 - x_vel_init;
+    if (std::abs(a) > max_acc_x_dt_)
+    {
+        a = (a/std::abs(a)) * max_acc_x_; //maintaining the sign
+    }
+    return a;
 }
 
 void FlyappyRos::setPos(geometry_msgs::Vector3 pos)
