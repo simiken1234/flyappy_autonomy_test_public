@@ -352,13 +352,13 @@ void FlyappyRos::gameEndedCallback(const std_msgs::Bool::ConstPtr& msg)
     obs_pair_.clear();
 }
 
-std::vector<double> FlyappyRos::getMaxYDecelSequence(double dist_left, double y_vel)
+std::vector<double> FlyappyRos::getMaxYDecelSequence(double y_vel, double dist_left)
 {
     std::vector<double> vel_seq;
     vel_seq.push_back(y_vel);
     int vel_sign_init = (y_vel > 0) ? 1 : -1;
 
-    while (((y_vel - (vel_sign_init * 1)) > 0) == (vel_sign_init > 0)){
+    while (((y_vel - (vel_sign_init * 1)) >= 0) == (vel_sign_init > 0)){
         // What if its exactly zero
         y_vel -= vel_sign_init * 1;
         vel_seq.push_back(y_vel);
@@ -391,15 +391,34 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
     int vel_sign_init = (y_vel_init >= 0) ? 1 : -1;
     int dist_sign_init = (dist_target >= 0) ? 1 : -1;
 
+    std::vector<double> vel_seq;
+
     // Check that velocity and distance left have the same sign
     if (vel_sign_init != dist_sign_init)
     {
         // If not, special case
         // Decrease vel to zero, update pos and call function again
+        vel_seq = getMaxYDecelSequence(y_vel_init, dist_left);
+
+        // Update pos and y_vel_init
+        for (int i = 1; i < vel_seq.size(); i++)
+        {
+            pos.y += vel_seq[i] * max_acc_y_;
+        }
+        y_vel_init = vel_seq.back() * max_acc_y_;
+        vel_seq.pop_back(); // This value will be added back by the recursive call
+
+        // Recursive call to finish the rest of the sequence
+        std::vector <double> vel_seq_rest = getYVelSequence(pos, y_vel_init, y_target);
+        for (int i = 0; i < vel_seq_rest.size(); i++)
+        {
+            vel_seq.push_back(vel_seq_rest[i]);
+        }
+
+        return vel_seq;
     }
 
     // Create optimal sequence of velocities
-    std::vector<double> vel_seq;
     vel_seq.push_back(y_vel_init);
 
     int y_vel_int;
@@ -428,10 +447,36 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         return vel_seq;
     }
 
-    // Special case for negative distance left after decel
-    if (dist_left < 0)
+    // Special case for overshoot
+    if ((dist_left * dist_sign_init) < 0)
     {
         // Throw out the current vel_seq and get one from max_decel, then see whats next recursively. Unless dist_left after decel is zero
+        vel_seq = getMaxYDecelSequence(y_vel_init, dist_target);
+        // Update pos
+        for (int i = 1; i < vel_seq.size(); i++) // Start at 1 to skip the first value which is just the speed at start
+        {
+            pos.y += vel_seq[i] * max_acc_y_;
+        }
+
+        // Check if we are done
+        if (pos.y == y_target)
+        {
+            vel_seq.push_back(0);
+            return vel_seq;
+        }
+
+        // If not done, update y_vel_init and call function again
+        y_vel_init = vel_seq.back() * max_acc_y_;
+        vel_seq.pop_back(); // This value will be added back by the recursive call
+
+        // Recursive call to finish the rest of the sequence if not done
+        std::vector <double> vel_seq_rest = getYVelSequence(pos, y_vel_init, y_target);
+        for (int i = 0; i < vel_seq_rest.size(); i++)
+        {
+            vel_seq.push_back(vel_seq_rest[i]);
+        }
+
+        return vel_seq;
     }
 
     // If positive distance left (default case) try to accelerate
