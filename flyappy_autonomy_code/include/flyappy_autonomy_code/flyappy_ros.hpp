@@ -22,6 +22,14 @@ struct gap
   int quality;
 };
 
+struct gap_quality_limits
+{
+  float q_1_min;
+  float q_1_max;
+  float q_2_min;
+  float q_2_max;
+};
+
 class Obstacle 
 {
   public:
@@ -61,9 +69,11 @@ class FlyappyRos
     std::vector<double> getYVelSequence(geometry_msgs::Vector3 pos, double y_vel_init, double y_target);
     double getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_init);
     void setPos(geometry_msgs::Vector3 pos);
+    void setGap(int i, gap new_gap);
     double getMaxAccXDt();
     double getMaxAccYDt();
     double getMaxAccY();
+    gap_quality_limits getGapQualityLimits();
 
   private:
     void velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg);
@@ -89,4 +99,5 @@ class FlyappyRos
     gap next_gap_;
     std::vector <double> y_vel_seq_;
     std::vector <double> y_vel_seq_next_;
+    gap_quality_limits gap_quality_limits_;
 };
