@@ -63,6 +63,7 @@ class FlyappyRos
     void setPos(geometry_msgs::Vector3 pos);
     double getMaxAccXDt();
     double getMaxAccYDt();
+    double getMaxAccY();
 
   private:
     void velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg);

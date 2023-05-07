@@ -4,15 +4,14 @@ constexpr uint32_t QUEUE_SIZE = 5u;
 const double max_laser_range = 3.50000; // Known max laser range - 0.05 for margin
 
 const float y_init = 1.555f;   // Approx initial height
-const float y_max = y_max_;     // Approx max height
-
-const float early_accel_offset = 0.2f; // Offset to start accelerating early
 
 const float obs_width = 0.7f; // Approx obstacle width
-const float obs_width_x_accel = 0.65f; // Obstacle width for x-accel
+const float obs_width_x_accel = 0.7f; // Obstacle width for x-accel
 const float obs_spacing = 1.92f; // Approx obstacle spacing
 const float obs_gap = 0.5f;  // The gap between upper and lower obstacle
-const int obs_gap_i = (int)std::ceil((obs_gap / y_max) * float(obs_array_size_)) - 2; // The gap between upper and lower obstacle in array index
+const int obs_gap_i = (int)std::ceil((obs_gap / y_max_) * float(obs_array_size_)) - 2; // The gap between upper and lower obstacle in array index
+
+const float early_accel_offset = 0.15f; // Offset to start accelerating early
 
 //------------------------------------------------------------------------------
 // GENERAL FUNCTIONS
@@ -72,7 +71,7 @@ void Obstacle::clear()
 void Obstacle::add(float y, int state) 
 {
     // Convert y to array index
-    int i = (int)std::round((y / y_max) * float(obs_array_size_ - 1));
+    int i = (int)std::round((y / y_max_) * float(obs_array_size_ - 1));
 
     // Only change state if it isn't already known to be obstacle
     if (obstacleArray_[i] != 1)
@@ -115,7 +114,7 @@ gap Obstacle::findGap()
                 {
                     // If gap is the best found yet, update best
                     best_gap_quality = current_gap_quality;
-                    best_gap_y = (float(i - 1) - (float(free_count + unknown_count) / 2)) * (y_max / float(obs_array_size_)); 
+                    best_gap_y = (float(i - 1) - (float(free_count + unknown_count) / 2)) * (y_max_ / float(obs_array_size_)); 
                     // y is for middle of the gap
                 }
 
@@ -132,7 +131,7 @@ gap Obstacle::findGap()
     {
         // If gap is the best found yet, update best
         best_gap_quality = current_gap_quality;
-        best_gap_y = (float(obs_array_size_ - 1) - (float(free_count + unknown_count) / 2)) * (y_max / float(obs_array_size_));
+        best_gap_y = (float(obs_array_size_ - 1) - (float(free_count + unknown_count) / 2)) * (y_max_ / float(obs_array_size_));
     }
 
     // If no suitable gap was found, something must have gone wrong. Failsafe by clearing obs to start over
@@ -249,7 +248,7 @@ FlyappyRos::FlyappyRos(ros::NodeHandle& nh)
 {
     pos_.x = 0;
     pos_.y = y_init;
-    current_gap_ = {y_max / 2, 0};
+    current_gap_ = {y_max_ / 2, 0};
     obs_pair_.clear();
 }
 
@@ -258,7 +257,7 @@ FlyappyRos::FlyappyRos()
     // For testing
     pos_.x = 0;
     pos_.y = y_init;
-    current_gap_ = {y_max / 2, 0};
+    current_gap_ = {y_max_ / 2, 0};
     obs_pair_.clear();
 }
 
@@ -426,21 +425,21 @@ std::vector<double> FlyappyRos::getMaxYDecelSequence(double y_vel, double dist_l
 
     while (((y_vel - (vel_sign_init * 1)) >= 0) == (vel_sign_init > 0)){
         // What if its exactly zero
-        y_vel -= vel_sign_init * 1;
+        y_vel -= vel_sign_init;
         vel_seq.push_back(y_vel);
-        dist_left -= y_vel;
+        dist_left -= y_vel * dt_;
     }
 
     // Check how much past zero we can accelerate and add the last velocity
-    if (std::abs(dist_left) >= std::abs(y_vel - (vel_sign_init * 1)))
+    if (std::abs(dist_left) >= std::abs((y_vel - (vel_sign_init * 1)) * dt_))
     {
-        y_vel -= vel_sign_init * 1;
+        y_vel -= vel_sign_init;
         vel_seq.push_back(y_vel);
-        dist_left -= y_vel;
+        dist_left -= y_vel * dt_;
     }
     else
     {
-        vel_seq.push_back(dist_left);
+        vel_seq.push_back(dist_left / dt_);
         dist_left = 0;
     }
 
@@ -453,6 +452,7 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
     double dist_target = (y_target - pos.y) / max_acc_y_dt_;
     double dist_left = dist_target; // For tracking distance travelled
     y_vel_init = y_vel_init / max_acc_y_dt_;
+    ROS_INFO("dist_target: %f", dist_target/dt_);
 
     int vel_sign_init = (y_vel_init >= 0) ? 1 : -1;
     int dist_sign_init = (dist_target >= 0) ? 1 : -1;
@@ -502,7 +502,7 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
 
     while(y_vel_int != 0)
     {
-        y_vel_int -= vel_sign_init * 1;
+        y_vel_int -= vel_sign_init;
         vel_seq.push_back(y_vel_int);
         dist_left -= y_vel_int * dt_;
     }
@@ -527,12 +527,18 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         // Check if we are done
         if (pos.y == y_target)
         {
+            // Print vel_seq
+            
+            for (int i = 0; i < vel_seq.size(); i++)
+            {
+                ROS_INFO("vel_seq[%d] = %f", i, vel_seq[i]);
+            }
             vel_seq.push_back(0);
             return vel_seq;
         }
 
         // If not done, update y_vel_init and call function again
-        y_vel_init = vel_seq.back() * max_acc_y_dt_ * dt_;
+        y_vel_init = vel_seq.back() * max_acc_y_dt_;
         vel_seq.pop_back(); // This value will be added back by the recursive call
 
         // Recursive call to finish the rest of the sequence if not done
@@ -540,6 +546,13 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
         for (int i = 0; i < vel_seq_rest.size(); i++)
         {
             vel_seq.push_back(vel_seq_rest[i]);
+        }
+
+            // Print vel_seq
+        
+        for (int i = 0; i < vel_seq.size(); i++)
+        {
+            ROS_INFO("vel_seq[%d] = %f", i, vel_seq[i]);
         }
 
         return vel_seq;
@@ -568,7 +581,7 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
     }
 
     // If dist_left is equal to between (vel_int_max + 1) and 2*(vel_int_max + 1), we need to add one more acceleration
-    if (std::abs(dist_left) >= std::abs((vel_int_max + vel_sign_init) * dt_))
+    if (std::abs(dist_left) >= std::abs((vel_int_max + vel_sign_init)) * dt_)
     {
         // Find the first instance of vel_int_max in the vector, insert vel_int_max + 1 after it
         i_max = 0;
@@ -593,21 +606,21 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
     int dist_left_int;
     if (dist_left >= 0)
     {
-        dist_left_int = std::floor(dist_left);
+        dist_left_int = std::floor(dist_left / dt_);
     }
     else
     {
-        dist_left_int = std::ceil(dist_left);
+        dist_left_int = std::ceil(dist_left / dt_);
     }
 
-    // Find the first matching integer from the back of the sequence
+    // Find the last matching integer in the sequence
     int i_match = vel_seq.size() - 1;
     while (vel_seq[i_match] != dist_left_int)
     {
         i_match--;
     }
     // Fit the rest of the distance before that integer
-    vel_seq.insert(vel_seq.begin() + i_match, dist_left);
+    vel_seq.insert(vel_seq.begin() + i_match, dist_left / dt_);
 
     // TODO: if there is a pair of integers right after the first float, you can put part of the decimal part of the rest of the dist
     //      on the first of that pair of integers, resulting in faster speed. This is a special case, so it is not implemented yet.
@@ -628,9 +641,9 @@ double FlyappyRos::getXAccelCommand(geometry_msgs::Vector3 pos, double x_vel_ini
 
     // Make sure that both q_1 and q_3 are within tuneable limits
     if (q_1 > 0.95){q_1 = 0.95;} // Safety margin
-    else if (q_1 < 0.4){q_1 = 0.4;}
-    if (q_3 > 0.97){q_3 = 0.97;}
-    else if (q_3 < 0.6){q_3 = 0.6;} // q_3 is slowing down too much, especially in pipe
+    else if (q_1 < 0.3){q_1 = 0.3;}
+    if (q_3 > 0.8){q_3 = 0.8;}
+    else if (q_3 < 0.4){q_3 = 0.4;} // q_3 is slowing down too much, especially in pipe
 
     // Q1: How fast can I go at x_2 to reach x_3 at t_3 at constant velocity?
 
@@ -706,6 +719,11 @@ void FlyappyRos::setPos(geometry_msgs::Vector3 pos)
 double FlyappyRos::getMaxAccYDt()
 {
     return max_acc_y_dt_;
+}
+
+double FlyappyRos::getMaxAccY()
+{
+    return max_acc_y_;
 }
 
 double FlyappyRos::getMaxAccXDt()

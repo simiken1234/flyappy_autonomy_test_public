@@ -72,7 +72,7 @@ TEST(GeneralFunctions, getGapQuality)
     ASSERT_EQ(q, 30 + (20 * obs_array_size_));
 }
 
-TEST(Obstacle, findGapAllUnknown)
+TEST(Obstacle, findGap_AllUnknown)
 {
     Obstacle obs;
     obs.clear();
@@ -81,7 +81,7 @@ TEST(Obstacle, findGapAllUnknown)
     ASSERT_EQ(g.quality, obs_array_size_);
 }
 
-TEST(Obstacle, findGapPartUnknown)
+TEST(Obstacle, findGap_PartUnknown)
 {
     Obstacle obs;
     std::array<int, obs_array_size_> new_obs_array;
@@ -98,7 +98,7 @@ TEST(Obstacle, findGapPartUnknown)
     ASSERT_EQ(g.quality, 40);
 }
 
-TEST(Obstacle, findGapComplex)
+TEST(Obstacle, findGap_Complex)
 {
     Obstacle obs;
     std::array<int, obs_array_size_> new_obs_array;
@@ -141,7 +141,7 @@ TEST(Obstacle, findGapComplex)
     ASSERT_NEAR(g.y, y_exp, gap_y_tolerance);
 }
 
-TEST(ObstaclePair, AddFreeObs1)
+TEST(ObstaclePair, Add_FreeObs1)
 {
     ObstaclePair obs_pair;
     obs_pair.clear();
@@ -165,7 +165,7 @@ TEST(ObstaclePair, AddFreeObs1)
     ASSERT_TRUE(obs1Array == expected_obs);
 }
 
-TEST(ObstaclePair, AddObstacleAfterFreeObs1)
+TEST(ObstaclePair, Add_ObstacleAfterFreeObs1)
 {
     ObstaclePair obs_pair;
     obs_pair.clear();
@@ -204,7 +204,7 @@ TEST(ObstaclePair, AddObstacleAfterFreeObs1)
     ASSERT_TRUE(obs1Array == expected_obs);
 }
 
-TEST(ObstaclePair, AddFreeAfterObstacleObs1)
+TEST(ObstaclePair, Add_FreeAfterObstacleObs1)
 {
     ObstaclePair obs_pair;
     obs_pair.clear();
@@ -253,7 +253,7 @@ TEST(ObstaclePair, AddFreeAfterObstacleObs1)
     ASSERT_TRUE(obs1Array == expected_obs);
 }
 
-TEST(ObstaclePair, AddFreeObstacleFreeObs2)
+TEST(ObstaclePair, Add_FreeObstacleFreeObs2)
 {
     ObstaclePair obs_pair;
     obs_pair.clear();
@@ -350,7 +350,7 @@ TEST(FlyappyRos, getMaxYDecelSequence_FullMaxDecel)
 
     ASSERT_EQ(exp_seq, y_vel_seq);
 
-    dist_left = 1.0d;
+    dist_left = 1.0d * dt_;
     y_vel = -1.5d;
 
     exp_seq = {-1.5d, -0.5d, 0.5d};
@@ -358,7 +358,7 @@ TEST(FlyappyRos, getMaxYDecelSequence_FullMaxDecel)
 
     ASSERT_EQ(exp_seq, y_vel_seq);
 
-    dist_left = 1.0d;
+    dist_left = 1.0d * dt_;
     y_vel = 5.0d;
 
     exp_seq = {5.0d, 4.0d, 3.0d, 2.0d, 1.0d, 0.0d, -1.0d};
@@ -366,7 +366,7 @@ TEST(FlyappyRos, getMaxYDecelSequence_FullMaxDecel)
 
     ASSERT_EQ(exp_seq, y_vel_seq);
 
-    dist_left = 0.1d;
+    dist_left = 0.1d * dt_;
     y_vel = 2.3d;
 
     exp_seq = {2.3d, 1.3d, 0.3d, -0.7d};
@@ -390,15 +390,18 @@ TEST(FlyappyRos, getMaxYDecelSequence_StopInTime)
 
     ASSERT_EQ(exp_seq, y_vel_seq);
 
-    dist_left = -0.3d;
+    dist_left = -0.3d * dt_;
     y_vel = -1.5d;
 
     exp_seq = {-1.5d, -0.5d, 0.2d};
     y_vel_seq = f.getMaxYDecelSequence(y_vel, dist_left);
 
-    ASSERT_EQ(exp_seq, y_vel_seq);
+    for (int i = 0; i < exp_seq.size(); i++)
+    {
+        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
+    }
 
-    dist_left = 9.5d;
+    dist_left = 9.5d * dt_;
     y_vel = 5.0d;
 
     exp_seq = {5.0d, 4.0d, 3.0d, 2.0d, 1.0d, 0.0d, -0.5d};
@@ -413,9 +416,9 @@ TEST(FlyappyRos, getYVelSequence_StartWithoutVel)
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
     pos.y = 0.0;
-    double max_acc_y = f.getMaxAccY();
+    double max_acc_y_dt = f.getMaxAccYDt();
 
-    double y_target = max_acc_y;
+    double y_target = max_acc_y_dt * dt_;
     double y_vel = 0.0d;
 
     std::vector<double> exp_seq = {0.0d, 1.0d, 0.0d};
@@ -423,9 +426,9 @@ TEST(FlyappyRos, getYVelSequence_StartWithoutVel)
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_target = max_acc_y + 0.5d;
+    y_target = 1.5d * (max_acc_y_dt) * dt_;
 
-    exp_seq = {0.0d, 1.0d, (y_target - max_acc_y)/max_acc_y, 0.0d};
+    exp_seq = {0.0d, 1.0d, 0.5d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     for (int i = 0; i < exp_seq.size(); i++)
@@ -433,21 +436,21 @@ TEST(FlyappyRos, getYVelSequence_StartWithoutVel)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    y_target = 3.5d * max_acc_y;
+    y_target = (3.5d * max_acc_y_dt) * dt_;
 
     exp_seq = {0.0d, 1.0d, 1.5d, 1.0d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_target = 6.5d * max_acc_y;
+    y_target = (6.5d * max_acc_y_dt) * dt_;
 
     exp_seq = {0.0d, 1.0d, 2.0d, 2.0d, 1.0d, 0.5d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(exp_seq, y_vel_seq);
 
-    y_target = 19.3d * max_acc_y;
+    y_target = (19.3d * max_acc_y_dt) * dt_;
 
     exp_seq = {0.0d, 1.0d, 2.0d, 3.0d, 4.0d, 3.3d, 3.0d, 2.0d, 1.0d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -464,31 +467,20 @@ TEST(FlyappyRos, getYVelSequence_StartWithVel_DecelOnly)
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
     pos.y = 0.0;
-    double max_acc_y = f.getMaxAccY();
+    double max_acc_y_dt = f.getMaxAccYDt();
 
-    double y_target = max_acc_y;
-    double y_vel = max_acc_y;
+    double y_target = max_acc_y_dt * dt_;
+    double y_vel = max_acc_y_dt;
 
     std::vector<double> exp_seq = {1.0d, 1.0d, 0.0d};
     std::vector<double> y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_target = max_acc_y + 0.5d;
-    y_vel = max_acc_y;
+    y_target = 1.5d * max_acc_y_dt * dt_;
+    y_vel = max_acc_y_dt;
 
-    exp_seq = {1.0d, 1.0d, (y_target - max_acc_y)/max_acc_y, 0.0d};
-    y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
-
-    for (int i = 0; i < exp_seq.size(); i++)
-    {
-        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
-    }
-
-    y_vel = max_acc_y + 0.5d;
-    y_target = max_acc_y;
-
-    exp_seq = {y_vel/max_acc_y, 1.0d, 0.0d};
+    exp_seq = {1.0d, 1.0d, 0.5d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     for (int i = 0; i < exp_seq.size(); i++)
@@ -503,31 +495,20 @@ TEST(FlyappyRos, getYVelSequence_StartWithNegVel_DecelOnly)
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
     pos.y = 0.0;
-    double max_acc_y = f.getMaxAccY();
+    double max_acc_y_dt = f.getMaxAccYDt();
 
-    double y_target = -max_acc_y;
-    double y_vel = -max_acc_y;
+    double y_target = -max_acc_y_dt * dt_;
+    double y_vel = -max_acc_y_dt;
 
     std::vector<double> exp_seq = {-1.0d, -1.0d, 0.0d};
     std::vector<double> y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_target = - max_acc_y - 0.5d;
-    y_vel = -max_acc_y;
+    y_target = -1.5 * max_acc_y_dt * dt_;
+    y_vel = -max_acc_y_dt;
 
-    exp_seq = {-1.0d, -1.0d, (y_target + max_acc_y)/max_acc_y, 0.0d};
-    y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
-
-    for (int i = 0; i < exp_seq.size(); i++)
-    {
-        ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
-    }
-
-    y_vel = -max_acc_y - 0.5d;
-    y_target = -max_acc_y;
-
-    exp_seq = {y_vel/max_acc_y, -1.0d, 0.0d};
+    exp_seq = {-1.0d, -1.0d, -0.5, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     for (int i = 0; i < exp_seq.size(); i++)
@@ -542,10 +523,10 @@ TEST(FlyappyRos, getYVelSequence_StartWithVel_WithAccel)
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
     pos.y = 0.0;
-    double max_acc_y = f.getMaxAccY();
+    double max_acc_y_dt = f.getMaxAccYDt();
 
-    double y_target = 8.2 * max_acc_y;
-    double y_vel = 2.3 * max_acc_y;
+    double y_target = 8.2 * max_acc_y_dt * dt_;
+    double y_vel = 2.3 * max_acc_y_dt;
 
     std::vector<double> exp_seq = {2.3d, 3.0d, 2.2d, 2.0d, 1.0d, 0.0d};
     std::vector<double> y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -555,8 +536,8 @@ TEST(FlyappyRos, getYVelSequence_StartWithVel_WithAccel)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    y_vel = 0.1 * max_acc_y;
-    y_target = 0.6 * max_acc_y;
+    y_target = 0.6 * max_acc_y_dt * dt_;
+    y_vel = 0.1 * max_acc_y_dt;
 
     exp_seq = {0.1d, 0.6d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -566,10 +547,10 @@ TEST(FlyappyRos, getYVelSequence_StartWithVel_WithAccel)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    pos.y = 1.5 * max_acc_y;
+    pos.y = 1.5 * max_acc_y_dt * dt_;
     pos.x = 73.0d;
-    y_target = 9.7 * max_acc_y;
-    y_vel = 2.3 * max_acc_y;
+    y_target = 9.7 * max_acc_y_dt * dt_;
+    y_vel = 2.3 * max_acc_y_dt;
     
     exp_seq = {2.3d, 3.0d, 2.2d, 2.0d, 1.0d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -586,10 +567,10 @@ TEST(FlyappyRos, getYVelSequence_StartWithNegVel_WithAccel)
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
     pos.y = 0.0;
-    double max_acc_y = f.getMaxAccY();
+    double max_acc_y_dt = f.getMaxAccYDt();
 
-    double y_target = -8.2 * max_acc_y;
-    double y_vel = -2.3 * max_acc_y;
+    double y_target = -8.2 * max_acc_y_dt * dt_;
+    double y_vel = -2.3 * max_acc_y_dt;
 
     std::vector<double> exp_seq = {-2.3d, -3.0d, -2.2d, -2.0d, -1.0d, 0.0d};
     std::vector<double> y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -599,8 +580,8 @@ TEST(FlyappyRos, getYVelSequence_StartWithNegVel_WithAccel)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    y_vel = -0.1 * max_acc_y;
-    y_target = -0.6 * max_acc_y;
+    y_vel = -0.1 * max_acc_y_dt;
+    y_target = -0.6 * max_acc_y_dt * dt_;
 
     exp_seq = {-0.1d, -0.6d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -617,34 +598,34 @@ TEST(FlyappyRos, getYVelSequence_DiffSigns)
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
     pos.y = 0.0;
-    double max_acc_y = f.getMaxAccY();
+    double max_acc_y_dt = f.getMaxAccYDt();
 
-    double y_target = 1.0 * max_acc_y;
-    double y_vel = -1.0 * max_acc_y;
+    double y_target = 1.0 * max_acc_y_dt * dt_;
+    double y_vel = -1.0 * max_acc_y_dt;
 
     std::vector<double> exp_seq = {-1.0d, 0.0d, 1.0d, 0.0d};
     std::vector<double> y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_vel = -1.0 * max_acc_y;
-    y_target = 2.0 * max_acc_y;
+    y_target = 2.0 * max_acc_y_dt * dt_;
+    y_vel = -1.0 * max_acc_y_dt;
 
     exp_seq = {-1.0d, 0.0d, 1.0d, 1.0d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_vel = 1.0 * max_acc_y;
-    y_target = -2.0 * max_acc_y;
+    y_target = -2.0 * max_acc_y_dt * dt_;
+    y_vel = 1.0 * max_acc_y_dt;
 
     exp_seq = {1.0d, 0.0d, -1.0d, -1.0d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_vel = 1.0 * max_acc_y;
-    y_target = -2.3 * max_acc_y;
+    y_target = -2.3 * max_acc_y_dt * dt_;
+    y_vel = 1.0 * max_acc_y_dt;
 
     exp_seq = {1.0d, 0.0d, -1.0d, -1.0d, -0.3d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -654,8 +635,8 @@ TEST(FlyappyRos, getYVelSequence_DiffSigns)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    y_vel = 2.1 * max_acc_y;
-    y_target = -2.3 * max_acc_y;
+    y_target = -2.3 * max_acc_y_dt * dt_;
+    y_vel = 2.1 * max_acc_y_dt;
 
     exp_seq = {2.1d, 1.1d, 0.1d, -0.9d, -1.0d, -1.0d, -0.6d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -665,10 +646,10 @@ TEST(FlyappyRos, getYVelSequence_DiffSigns)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    pos.y = 1 * max_acc_y;
-    pos.x = 1 * max_acc_y;
-    y_vel = 2.1 * max_acc_y;
-    y_target = -1.3 * max_acc_y;
+    pos.y = 1 * max_acc_y_dt * dt_;
+    pos.x = 1 * max_acc_y_dt;
+    y_target = -1.3 * max_acc_y_dt * dt_;
+    y_vel = 2.1 * max_acc_y_dt;
 
     exp_seq = {2.1d, 1.1d, 0.1d, -0.9d, -1.0d, -1.0d, -0.6d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -685,18 +666,18 @@ TEST(FlyappyRos, getYVelSequence_Overshoot)
     geometry_msgs::Vector3 pos;
     pos.x = 0.0;
     pos.y = 0.0;
-    double max_acc_y = f.getMaxAccY();
+    double max_acc_y_dt = f.getMaxAccYDt();
 
-    double y_vel = 3.0 * max_acc_y;
-    double y_target = 2.0 * max_acc_y;
+    double y_vel = 3.0 * max_acc_y_dt;
+    double y_target = 2.0 * max_acc_y_dt * dt_;
 
     std::vector<double> exp_seq = {3.0d, 2.0d, 1.0d, 0.0d, -1.0d, 0.0d};
     std::vector<double> y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
 
     ASSERT_EQ(y_vel_seq, exp_seq);
 
-    y_vel = 3.2 * max_acc_y;
-    y_target = 2.5 * max_acc_y;
+    y_vel = 3.2 * max_acc_y_dt;
+    y_target = 2.5 * max_acc_y_dt * dt_;
 
     exp_seq = {3.2d, 2.2d, 1.2d, 0.2d, -0.8d, -0.3d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -706,8 +687,8 @@ TEST(FlyappyRos, getYVelSequence_Overshoot)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    y_vel = -3.2 * max_acc_y;
-    y_target = -2.5 * max_acc_y;
+    y_vel = -3.2 * max_acc_y_dt;
+    y_target = -2.5 * max_acc_y_dt * dt_;
 
     exp_seq = {-3.2d, -2.2d, -1.2d, -0.2d, 0.8d, 0.3d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -717,8 +698,8 @@ TEST(FlyappyRos, getYVelSequence_Overshoot)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    y_vel = 1.4 * max_acc_y;
-    y_target = 0.0 * max_acc_y;
+    y_vel = 1.4 * max_acc_y_dt;
+    y_target = 0.0 * max_acc_y_dt * dt_;
 
     exp_seq = {1.4d, 0.4d, -0.4d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
@@ -728,9 +709,9 @@ TEST(FlyappyRos, getYVelSequence_Overshoot)
         ASSERT_NEAR(y_vel_seq[i], exp_seq[i], 0.0001d);
     }
 
-    pos.y = 1.0 * max_acc_y;
-    y_vel = -3.2 * max_acc_y;
-    y_target = -1.5 * max_acc_y;
+    pos.y = 1.0 * max_acc_y_dt * dt_;
+    y_vel = -3.2 * max_acc_y_dt;
+    y_target = -1.5 * max_acc_y_dt * dt_;
 
     exp_seq = {-3.2d, -2.2d, -1.2d, -0.2d, 0.8d, 0.3d, 0.0d};
     y_vel_seq = f.getYVelSequence(pos, y_vel, y_target);
