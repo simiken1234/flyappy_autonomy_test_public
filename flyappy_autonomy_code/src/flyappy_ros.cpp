@@ -11,7 +11,7 @@ const float obs_spacing = 1.92f; // Approx obstacle spacing
 const float obs_gap = 0.5f;  // The gap between upper and lower obstacle
 const int obs_gap_i = (int)std::ceil((obs_gap / y_max_) * float(obs_array_size_)) - 2; // The gap between upper and lower obstacle in array index
 
-const float early_accel_offset = 0.15f; // Offset to start accelerating early
+const float early_accel_offset = 0.1f; // Offset to start accelerating early
 
 //------------------------------------------------------------------------------
 // GENERAL FUNCTIONS
@@ -320,9 +320,9 @@ FlyappyRos::FlyappyRos(ros::NodeHandle& nh)
     obs_pair_.clear();
     // Gap quality margins used for x-accel
     gap_quality_limits_.q_1_max = 0.95;
-    gap_quality_limits_.q_1_min = 0.3;
+    gap_quality_limits_.q_1_min = 0.65;
     gap_quality_limits_.q_3_max = 0.8;
-    gap_quality_limits_.q_3_min = 0.4;
+    gap_quality_limits_.q_3_min = 0.5;
 }
 
 FlyappyRos::FlyappyRos()
@@ -333,9 +333,9 @@ FlyappyRos::FlyappyRos()
     current_gap_ = {y_max_ / 2, 0};
     obs_pair_.clear();
     gap_quality_limits_.q_1_max = 0.95;
-    gap_quality_limits_.q_1_min = 0.3;
+    gap_quality_limits_.q_1_min = 0.65;
     gap_quality_limits_.q_3_max = 0.8;
-    gap_quality_limits_.q_3_min = 0.4;
+    gap_quality_limits_.q_3_min = 0.5;
 }
 
 void FlyappyRos::velocityCallback(const geometry_msgs::Vector3::ConstPtr& msg)
@@ -532,7 +532,6 @@ std::vector<double> FlyappyRos::getYVelSequence(geometry_msgs::Vector3 pos, doub
     double dist_target = (y_target - pos.y) / max_acc_y_dt_;
     double dist_left = dist_target; // For tracking distance travelled
     y_vel_init = y_vel_init / max_acc_y_dt_;
-    ROS_INFO("dist_target: %f", dist_target/dt_);
 
     int vel_sign_init = (y_vel_init >= 0) ? 1 : -1;
     int dist_sign_init = (dist_target >= 0) ? 1 : -1;

@@ -26,8 +26,8 @@ struct gap_quality_limits
 {
   float q_1_min;
   float q_1_max;
-  float q_2_min;
-  float q_2_max;
+  float q_3_min;
+  float q_3_max;
 };
 
 class Obstacle 
